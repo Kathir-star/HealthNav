@@ -118,6 +118,11 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({ onComplete }
       }
       
       toast.error(errorMessage, { id: toastId });
+      
+      // If it's an unknown error, show the raw message for debugging
+      if (errorMessage === "Failed to save profile. Please try again.") {
+        toast.error(`Debug: ${error.message || JSON.stringify(error)}`, { duration: 5000 });
+      }
     } finally {
       setLoading(false);
     }

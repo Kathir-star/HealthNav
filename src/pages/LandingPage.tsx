@@ -1,14 +1,10 @@
 import React from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Shield, Activity, Heart, ArrowRight, CheckCircle2, Star, Menu, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
-interface LandingPageProps {
-  onGetStarted: () => void;
-  onLogin: () => void;
-}
-
-export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
+export const LandingPage: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
   return (
@@ -32,15 +28,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
           </div>
 
           <div className="hidden md:flex items-center gap-4">
-            <button onClick={onLogin} className="text-sm font-bold text-emerald-100/60 hover:text-white transition-colors">
+            <Link to="/auth/login" className="text-sm font-bold text-emerald-100/60 hover:text-white transition-colors">
               Sign In
-            </button>
-            <button 
-              onClick={onGetStarted}
+            </Link>
+            <Link 
+              to="/auth"
               className="px-6 py-2.5 rounded-xl bg-emerald-500 text-white font-bold text-sm neon-glow-teal hover:scale-105 transition-all active:scale-95"
             >
               Get Started
-            </button>
+            </Link>
           </div>
 
           <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="md:hidden p-2 text-emerald-100/60">
@@ -65,12 +61,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
                 </a>
               ))}
               <div className="pt-6 space-y-4">
-                <button onClick={onLogin} className="w-full py-4 rounded-2xl border border-white/10 text-white font-bold">
+                <Link to="/auth/login" className="block w-full py-4 rounded-2xl border border-white/10 text-white font-bold text-center">
                   Sign In
-                </button>
-                <button onClick={onGetStarted} className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold neon-glow-teal">
+                </Link>
+                <Link to="/auth" className="block w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold neon-glow-teal text-center">
                   Get Started
-                </button>
+                </Link>
               </div>
             </div>
           </motion.div>
@@ -119,12 +115,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
             transition={{ delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
           >
-            <button 
-              onClick={onGetStarted}
+            <Link 
+              to="/auth"
               className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-emerald-500 text-white font-bold text-lg neon-glow-teal flex items-center justify-center gap-2 hover:scale-105 transition-all active:scale-95"
             >
               Start Your Journey <ArrowRight className="w-5 h-5" />
-            </button>
+            </Link>
             <button className="w-full sm:w-auto px-8 py-4 rounded-2xl glass border border-white/10 text-white font-bold text-lg hover:bg-white/5 transition-all">
               Watch Demo
             </button>
@@ -262,9 +258,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
                   </div>
                 ))}
               </div>
-              <button onClick={onGetStarted} className="px-8 py-4 rounded-2xl bg-white text-emerald-950 font-bold hover:scale-105 transition-all">
+              <Link to="/auth" className="px-8 py-4 rounded-2xl bg-white text-emerald-950 font-bold hover:scale-105 transition-all">
                 Join the Network
-              </button>
+              </Link>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
@@ -346,5 +342,3 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
     </div>
   );
 };
-
-import { AnimatePresence } from 'motion/react';

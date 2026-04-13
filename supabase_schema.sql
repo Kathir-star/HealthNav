@@ -140,10 +140,11 @@ BEGIN
   VALUES (
     NEW.id, 
     COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', NEW.email), 
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', NEW.email), 
+    COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', NEW.email), 
     NEW.email, 
     'patient'
-  );
+  )
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -178,8 +179,9 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- USERS POLICIES
-CREATE POLICY "Users can view own profile" ON public.users FOR SELECT USING (auth.uid() = id AND is_deleted = FALSE OR is_admin());
-CREATE POLICY "Users can update own profile" ON public.users FOR UPDATE USING (auth.uid() = id AND is_deleted = FALSE OR is_admin());
+CREATE POLICY "Users can view own profile" ON public.users FOR SELECT USING (auth.uid() = id OR is_admin());
+CREATE POLICY "Users can update own profile" ON public.users FOR UPDATE USING (auth.uid() = id OR is_admin());
+CREATE POLICY "Users can insert own profile" ON public.users FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- PATIENTS POLICIES
 CREATE POLICY "Patients view own data" ON public.patients FOR SELECT USING (auth.uid() = user_id AND is_deleted = FALSE OR is_admin());

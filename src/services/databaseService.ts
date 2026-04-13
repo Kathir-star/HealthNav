@@ -14,22 +14,44 @@ export const databaseService = {
   },
 
   async upsertProfile(userId: string, profileData: any) {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .upsert({ id: userId, ...profileData })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Supabase Upsert Error:', error);
-        throw error;
+    const maxRetries = 3;
+    let lastError: any;
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        // Try update first (assuming trigger already created the row)
+        const { data, error: updateError } = await supabase
+          .from('users')
+          .update(profileData)
+          .eq('id', userId)
+          .select()
+          .single();
+        
+        if (!updateError) return data;
+
+        // If update fails because row doesn't exist (PGRST116), try upsert
+        if (updateError.code === 'PGRST116') {
+          const { data: upsertData, error: upsertError } = await supabase
+            .from('users')
+            .upsert({ id: userId, ...profileData })
+            .select()
+            .single();
+          
+          if (!upsertError) return upsertData;
+          lastError = upsertError;
+        } else {
+          lastError = updateError;
+        }
+      } catch (err) {
+        lastError = err;
       }
-      return data;
-    } catch (err: any) {
-      console.error('Database Service Error (upsertProfile):', err);
-      throw err;
+      
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
     }
+
+    console.error('Database Service Error (upsertProfile) after retries:', lastError);
+    throw lastError;
   },
 
   // Reminder operations

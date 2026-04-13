@@ -14,7 +14,6 @@ import { SettingsTab } from './components/SettingsTab';
 import { VitalsTab } from './components/VitalsTab';
 import { ProfileTab } from './components/ProfileTab';
 import { CameraMode } from './components/CameraMode';
-import { AuthModal } from './components/AuthModal';
 import { ScanFAB } from './components/ScanFAB';
 import { AiriAssistant } from './components/AiriAssistant';
 import { FeedbackModal } from './components/FeedbackModal';
@@ -27,29 +26,45 @@ import { LandingPage } from './pages/LandingPage';
 import { authService } from './services/authService';
 import { databaseService } from './services/databaseService';
 import { User as SupabaseUser } from '@supabase/supabase-js';
+import { AuthPage } from './pages/AuthPage';
 
-const AppContent = () => {
+const ProtectedRoute = ({ children, user, isAuthReady }: { children: React.ReactNode, user: SupabaseUser | null, isAuthReady: boolean }) => {
+  if (!isAuthReady) {
+    return (
+      <div className="fixed inset-0 z-[300] bg-emerald-950 flex items-center justify-center">
+        <motion.div 
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+const AppContent = ({ user }: { user: SupabaseUser | null }) => {
   const [activeTab, setActiveTab] = React.useState<Tab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
   const [isTermsOpen, setIsTermsOpen] = React.useState(false);
-  const [isAuthOpen, setIsAuthOpen] = React.useState(false);
   const [isCameraOpen, setIsCameraOpen] = React.useState(false);
   const [airiMessage, setAiriMessage] = React.useState<string | undefined>("Welcome back! I'm Airi, your health guide.");
   const [airiState, setAiriState] = React.useState<'calm' | 'attentive' | 'urgent'>('calm');
-  const [user, setUser] = React.useState<SupabaseUser | null>(null);
-  const [isAuthReady, setIsAuthReady] = React.useState(false);
   const [isOnboardingNeeded, setIsOnboardingNeeded] = React.useState(false);
   const [isDiagnosing, setIsDiagnosing] = React.useState(false);
   const [detectedSensors, setDetectedSensors] = React.useState<string[]>([]);
 
   React.useEffect(() => {
-    const { data: { subscription } } = authService.onAuthStateChange(async (currentUser) => {
-      setUser(currentUser);
-      
-      if (currentUser) {
+    if (user) {
+      const checkOnboarding = async () => {
         try {
-          const profile = await databaseService.getProfile(currentUser.id);
+          const profile = await databaseService.getProfile(user.id);
           if (profile) {
             setIsOnboardingNeeded(!profile.onboarding_completed);
           } else {
@@ -58,14 +73,10 @@ const AppContent = () => {
         } catch (error) {
           console.error('Error fetching profile:', error);
         }
-      } else {
-        setIsOnboardingNeeded(false);
-      }
-      
-      setIsAuthReady(true);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+      };
+      checkOnboarding();
+    }
+  }, [user]);
 
   const handleSetupDashboard = () => {
     setAiriState('attentive');
@@ -85,33 +96,6 @@ const AppContent = () => {
     setAiriState('calm');
     setAiriMessage(`I've found details for ${medicine}. Let's check the best prices!`);
   };
-
-  if (!isAuthReady) {
-    return (
-      <div className="fixed inset-0 z-[300] bg-emerald-950 flex items-center justify-center">
-        <motion.div 
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full"
-        />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <>
-        <LandingPage 
-          onGetStarted={() => setIsAuthOpen(true)} 
-          onLogin={() => setIsAuthOpen(true)} 
-        />
-        <AuthModal 
-          isOpen={isAuthOpen} 
-          onClose={() => setIsAuthOpen(false)} 
-        />
-      </>
-    );
-  }
 
   return (
     <div className="min-h-screen relative flex flex-col lg:flex-row overflow-x-hidden">
@@ -222,11 +206,43 @@ const AppContent = () => {
 };
 
 export default function App() {
+  const [user, setUser] = React.useState<SupabaseUser | null>(null);
+  const [isAuthReady, setIsAuthReady] = React.useState(false);
+
+  React.useEffect(() => {
+    const { data: { subscription } } = authService.onAuthStateChange((currentUser) => {
+      setUser(currentUser);
+      setIsAuthReady(true);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (!isAuthReady) {
+    return (
+      <div className="fixed inset-0 z-[300] bg-emerald-950 flex items-center justify-center">
+        <motion.div 
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Toaster position="top-center" richColors />
       <Routes>
-        <Route path="/" element={<AppContent />} />
+        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/auth/*" element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute user={user} isAuthReady={isAuthReady}>
+              <AppContent user={user} />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
