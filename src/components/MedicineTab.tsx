@@ -1,6 +1,8 @@
 import React from 'react';
-import { Search, Pill, ArrowUpRight, ArrowDownRight, Minus, CheckCircle2, Camera, X, Info, ShoppingCart, Clock, ExternalLink, Loader2, Sparkles, BookOpen, ShieldCheck, AlertTriangle, XCircle } from 'lucide-react';
+import { Search, Pill, ArrowUpRight, ArrowDownRight, Minus, CheckCircle2, Camera, X, Info, ShoppingCart, Clock, ExternalLink, Loader2, Sparkles, BookOpen, ShieldCheck, AlertTriangle, XCircle, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
+import { supabase } from '../lib/supabase';
 import { GlassCard } from './GlassCard';
 import { cn } from '../lib/utils';
 import { ArticleSection } from './ArticleSection';
@@ -146,34 +148,204 @@ export const MedicineTab: React.FC = () => {
     }
   };
 
+  const [reminders, setReminders] = React.useState<any[]>([]);
+  const [isAddingMed, setIsAddingMed] = React.useState(false);
+  const [newMed, setNewMed] = React.useState({ name: '', dosage: '', time: 'Morning' });
+
+  React.useEffect(() => {
+    if (profile) {
+      fetchReminders();
+    }
+  }, [profile]);
+
+  const fetchReminders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('reminders')
+        .select('*')
+        .eq('user_id', profile?.uid)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setReminders(data || []);
+    } catch (err) {
+      console.error("Error fetching reminders:", err);
+    }
+  };
+
+  const handleAddMed = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMed.name || !newMed.dosage) return;
+
+    try {
+      const { error } = await supabase
+        .from('reminders')
+        .insert([{
+          user_id: profile?.uid,
+          medicine_name: newMed.name,
+          dosage: newMed.dosage,
+          time: newMed.time,
+          taken: false
+        }]);
+
+      if (error) throw error;
+      toast.success("Medicine added to your tracker!");
+      setIsAddingMed(false);
+      setNewMed({ name: '', dosage: '', time: 'Morning' });
+      fetchReminders();
+    } catch (err) {
+      console.error("Error adding medicine:", err);
+      toast.error("Failed to add medicine.");
+    }
+  };
+
+  const handleDeleteMed = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('reminders')
+        .update({ is_deleted: true })
+        .eq('id', id);
+
+      if (error) throw error;
+      setReminders(prev => prev.filter(r => r.id !== id));
+      toast.success("Medicine removed.");
+    } catch (err) {
+      console.error("Error deleting medicine:", err);
+    }
+  };
+
+  const toggleTaken = async (id: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('reminders')
+        .update({ 
+          taken: !currentStatus,
+          last_taken_date: !currentStatus ? new Date().toISOString() : null
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      setReminders(prev => prev.map(r => r.id === id ? { ...r, taken: !currentStatus } : r));
+    } catch (err) {
+      console.error("Error updating status:", err);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-24">
-      <AnimatePresence>
-        {isSearching && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[500] bg-emerald-950/80 backdrop-blur-md flex flex-col items-center justify-center"
-          >
-            <div className="relative">
-              <motion.div 
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                className="w-32 h-32 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full"
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Sparkles className="w-10 h-10 text-emerald-400 animate-pulse" />
+      {/* Medicine Tracker Section */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-2xl font-bold text-emerald-50">My Medicine Tracker</h2>
+          <p className="text-sm text-emerald-100/60 font-medium">Manage your daily medications and reminders</p>
+        </div>
+        <button 
+          onClick={() => setIsAddingMed(true)}
+          className="p-3 rounded-xl bg-emerald-500 text-white shadow-lg neon-glow-teal hover:scale-105 transition-transform"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
+        {reminders.length === 0 ? (
+          <GlassCard className="col-span-full py-12 text-center border-dashed border-emerald-500/20">
+            <Clock className="w-12 h-12 text-emerald-500/20 mx-auto mb-3" />
+            <p className="text-emerald-100/40 text-sm">No medicines added yet. Click the + button to start tracking.</p>
+          </GlassCard>
+        ) : (
+          reminders.map((med, idx) => (
+            <GlassCard key={med.id} delay={idx * 0.05} className="flex items-center justify-between p-4 border-emerald-500/10">
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => toggleTaken(med.id, med.taken)}
+                  className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all",
+                    med.taken ? "bg-emerald-500 border-emerald-500 text-white" : "border-emerald-500/20 text-emerald-500/40 hover:border-emerald-500"
+                  )}
+                >
+                  <CheckCircle2 className="w-6 h-6" />
+                </button>
+                <div>
+                  <h4 className="font-bold text-emerald-50">{med.medicine_name}</h4>
+                  <p className="text-xs text-emerald-100/60">{med.dosage} • {med.time}</p>
+                </div>
               </div>
-            </div>
-            <motion.p 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-6 text-emerald-50 font-bold tracking-widest uppercase text-sm"
+              <button 
+                onClick={() => handleDeleteMed(med.id)}
+                className="p-2 text-emerald-100/20 hover:text-red-400 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </GlassCard>
+          ))
+        )}
+      </div>
+
+      <AnimatePresence>
+        {isAddingMed && (
+          <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-emerald-950/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full max-w-md"
             >
-              AI Searching Asia-Wide Pharmacies...
-            </motion.p>
-          </motion.div>
+              <GlassCard className="p-6 border-emerald-500/30">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-emerald-50">Add Medication</h3>
+                  <button onClick={() => setIsAddingMed(false)} className="text-emerald-100/40 hover:text-white">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                <form onSubmit={handleAddMed} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5">Medicine Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={newMed.name}
+                      onChange={e => setNewMed({...newMed, name: e.target.value})}
+                      className="w-full h-12 px-4 rounded-xl glass border-emerald-500/20 text-emerald-50 outline-none focus:border-emerald-500"
+                      placeholder="e.g. Paracetamol"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5">Dosage</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={newMed.dosage}
+                      onChange={e => setNewMed({...newMed, dosage: e.target.value})}
+                      className="w-full h-12 px-4 rounded-xl glass border-emerald-500/20 text-emerald-50 outline-none focus:border-emerald-500"
+                      placeholder="e.g. 500mg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5">Reminder Time</label>
+                    <select 
+                      value={newMed.time}
+                      onChange={e => setNewMed({...newMed, time: e.target.value})}
+                      className="w-full h-12 px-4 rounded-xl glass border-emerald-500/20 text-emerald-50 outline-none focus:border-emerald-500 bg-emerald-900"
+                    >
+                      <option>Morning</option>
+                      <option>Afternoon</option>
+                      <option>Evening</option>
+                      <option>Night</option>
+                      <option>As Needed</option>
+                    </select>
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full py-4 rounded-xl bg-emerald-500 text-white font-bold neon-glow-teal shadow-lg mt-4"
+                  >
+                    Save Reminder
+                  </button>
+                </form>
+              </GlassCard>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
       <div className="flex flex-col gap-2">

@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, X, Mic, Send, Activity, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { GlassCard } from './GlassCard';
 import { getAiriResponse } from '../services/geminiService';
@@ -165,15 +166,44 @@ export const AiriAssistant: React.FC<AiriAssistantProps> = ({
 
   const toggleListening = () => {
     if (!isListening) {
-      setIsListening(true);
-      // Simulate voice recognition for now as Web Speech API can be tricky in iframes
-      setTimeout(() => {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        toast.error("Speech recognition is not supported in this browser.");
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setAiriState('attentive');
+      };
+
+      recognition.onresult = (event: any) => {
+        const text = event.results[0][0].transcript;
+        handleSendMessage(text);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
         setIsListening(false);
-        const simulatedVoiceText = "Find me a hospital with cardiology speciality.";
-        handleSendMessage(simulatedVoiceText);
-      }, 3000);
-    } else {
-      setIsListening(false);
+        setAiriState('calm');
+        if (event.error === 'not-allowed') {
+          toast.error("Microphone permission denied.");
+        } else {
+          toast.error("Error during voice recognition.");
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        setAiriState('calm');
+      };
+
+      recognition.start();
     }
   };
 

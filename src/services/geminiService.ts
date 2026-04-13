@@ -1,7 +1,17 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { HealthProfile } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+async function callAiApi(payload: any) {
+  const response = await fetch("/api/ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to call AI API");
+  }
+  return await response.json();
+}
 
 const AIRI_SYSTEM_PROMPT = `You are an advanced AI healthcare assistant named Airi, integrated into a real-world medical safety application. Your role is to analyze, guide, and protect the user by providing safe, personalized, and accurate health-related insights.
 
@@ -89,15 +99,12 @@ export async function getAiriResponse(message: string, profile: HealthProfile | 
 * Pregnancy status: ${profile.pregnancy.status.replace("_", " ")}
 ` : "### USER DATA\nNo profile data available. Ask user for basic health info if needed for safety.";
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: message,
-      config: {
-        systemInstruction: AIRI_SYSTEM_PROMPT + "\n\n" + userContext,
-      }
+    const result = await callAiApi({
+      prompt: message,
+      systemInstruction: AIRI_SYSTEM_PROMPT + "\n\n" + userContext,
     });
 
-    return response.text || "I'm sorry, I couldn't process that request. Please consult a medical professional.";
+    return result.text || "I'm sorry, I couldn't process that request. Please consult a medical professional.";
   } catch (error) {
     console.error("Airi Error:", error);
     return "I'm having trouble connecting to my medical database. If this is an emergency, please call emergency services immediately.";
@@ -106,8 +113,7 @@ export async function getAiriResponse(message: string, profile: HealthProfile | 
 
 export async function processPrescription(base64Image: string) {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+    const result = await callAiApi({
       contents: [
         {
           parts: [
@@ -116,27 +122,25 @@ export async function processPrescription(base64Image: string) {
           ]
         }
       ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              strength: { type: Type.STRING },
-              form: { type: Type.STRING },
-              pack: { type: Type.STRING },
-              dose: { type: Type.STRING },
-              confidence: { type: Type.NUMBER }
-            },
-            required: ["name", "strength"]
-          }
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            strength: { type: "string" },
+            form: { type: "string" },
+            pack: { type: "string" },
+            dose: { type: "string" },
+            confidence: { type: "number" }
+          },
+          required: ["name", "strength"]
         }
       }
     });
 
-    return JSON.parse(response.text || "[]");
+    return JSON.parse(result.text || "[]");
   } catch (error) {
     console.error("OCR Error:", error);
     return [];
@@ -145,8 +149,7 @@ export async function processPrescription(base64Image: string) {
 
 export async function scanMedicine(base64Image: string) {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+    const result = await callAiApi({
       contents: [
         {
           parts: [
@@ -155,23 +158,21 @@ export async function scanMedicine(base64Image: string) {
           ]
         }
       ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            name: { type: Type.STRING },
-            strength: { type: Type.STRING },
-            form: { type: Type.STRING },
-            primaryUse: { type: Type.STRING },
-            confidence: { type: Type.NUMBER }
-          },
-          required: ["name", "strength"]
-        }
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          strength: { type: "string" },
+          form: { type: "string" },
+          primaryUse: { type: "string" },
+          confidence: { type: "number" }
+        },
+        required: ["name", "strength"]
       }
     });
 
-    return JSON.parse(response.text || "{}");
+    return JSON.parse(result.text || "{}");
   } catch (error) {
     console.error("Medicine Scan Error:", error);
     return null;
@@ -180,23 +181,20 @@ export async function scanMedicine(base64Image: string) {
 
 export async function getCareRecommendations(symptoms: string) {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Map these symptoms to treatment tags and suggest hospital types: ${symptoms}. Return JSON with tags and rationale.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-            rationale: { type: Type.STRING },
-            suggestedSpecialty: { type: Type.STRING }
-          }
+    const result = await callAiApi({
+      prompt: `Map these symptoms to treatment tags and suggest hospital types: ${symptoms}. Return JSON with tags and rationale.`,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "object",
+        properties: {
+          tags: { type: "array", items: { type: "string" } },
+          rationale: { type: "string" },
+          suggestedSpecialty: { type: "string" }
         }
       }
     });
 
-    return JSON.parse(response.text || "{}");
+    return JSON.parse(result.text || "{}");
   } catch (error) {
     console.error("Recommendation Error:", error);
     return { tags: [], rationale: "Unable to process symptoms at this time.", suggestedSpecialty: "General Physician" };
@@ -205,12 +203,11 @@ export async function getCareRecommendations(symptoms: string) {
 
 export async function summarizeReviews(reviews: string[]) {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Summarize these hospital reviews into a 2-line summary focusing on treatment quality and trust: ${reviews.join("\n")}`,
+    const result = await callAiApi({
+      prompt: `Summarize these hospital reviews into a 2-line summary focusing on treatment quality and trust: ${reviews.join("\n")}`,
     });
 
-    return response.text || "No summary available.";
+    return result.text || "No summary available.";
   } catch (error) {
     console.error("Summarization Error:", error);
     return "Unable to summarize reviews.";
@@ -229,27 +226,24 @@ export async function generateDietPlan(profile: HealthProfile | null) {
 * Pregnancy status: ${profile.pregnancy.status.replace("_", " ")}
 ` : "";
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Generate a personalized 1-day sample diet plan (Breakfast, Lunch, Dinner, Snack) based on my profile. 
+    const result = await callAiApi({
+      prompt: `Generate a personalized 1-day sample diet plan (Breakfast, Lunch, Dinner, Snack) based on my profile. 
       Include calorie estimates and why each meal is good for my conditions. 
       Return as a JSON object with 'meals' array (name, items, calories, rationale).`,
-      config: {
-        systemInstruction: "You are a clinical nutritionist AI. " + userContext,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            meals: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  items: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  calories: { type: Type.NUMBER },
-                  rationale: { type: Type.STRING }
-                }
+      systemInstruction: "You are a clinical nutritionist AI. " + userContext,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "object",
+        properties: {
+          meals: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                items: { type: "array", items: { type: "string" } },
+                calories: { type: "number" },
+                rationale: { type: "string" }
               }
             }
           }
@@ -257,7 +251,7 @@ export async function generateDietPlan(profile: HealthProfile | null) {
       }
     });
 
-    return JSON.parse(response.text || "{}");
+    return JSON.parse(result.text || "{}");
   } catch (error) {
     console.error("Diet Plan Error:", error);
     return { meals: [] };
@@ -266,34 +260,31 @@ export async function generateDietPlan(profile: HealthProfile | null) {
 
 export async function getRecommendedArticles(query: string) {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Find 3 verified health articles from reputable sources (like WHO, Mayo Clinic, WebMD, Lancet) related to: ${query}. 
+    const result = await callAiApi({
+      prompt: `Find 3 verified health articles from reputable sources (like WHO, Mayo Clinic, WebMD, Lancet) related to: ${query}. 
       Provide a title, a 2-line summary, the source name, a real-looking URL, an image URL (use picsum.photos), and relevant tags. 
       Return as a JSON array of objects.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              title: { type: Type.STRING },
-              summary: { type: Type.STRING },
-              source: { type: Type.STRING },
-              url: { type: Type.STRING },
-              imageUrl: { type: Type.STRING },
-              tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-              category: { type: Type.STRING }
-            },
-            required: ["title", "summary", "source", "url", "imageUrl", "tags", "category"]
-          }
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            title: { type: "string" },
+            summary: { type: "string" },
+            source: { type: "string" },
+            url: { type: "string" },
+            imageUrl: { type: "string" },
+            tags: { type: "array", items: { type: "string" } },
+            category: { type: "string" }
+          },
+          required: ["title", "summary", "source", "url", "imageUrl", "tags", "category"]
         }
       }
     });
 
-    const articles = JSON.parse(response.text || "[]");
+    const articles = JSON.parse(result.text || "[]");
     return articles.map((a: any, i: number) => ({
       ...a,
       id: a.id || `art-${Date.now()}-${i}`
