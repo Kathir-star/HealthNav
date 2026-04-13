@@ -1,0 +1,13 @@
+{
+  "name": "Remix: Remix: HealthNav AI",
+  "description": "A calm, anime-inspired healthcare navigator for Pan-Asia, featuring Airi assistant, medicine discovery, care matching, and donor verification.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation",
+    "bluetooth",
+    "accelerometer",
+    "gyroscope",
+    "fullscreen"
+  ]
+}

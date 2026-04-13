@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-teal-calm: #10B981; /* Emerald Green */
+  --color-warm-glow: #84CC16; /* Lime Green (Replacing Amber) */
+  --color-deep-indigo: #064E3B; /* Dark Green */
+  --color-soft-lavender: #064E3B; /* Deep Forest Green */
+  --color-mirror-white: rgba(6, 78, 59, 0.7);
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-emerald-950/80 backdrop-blur-3xl border border-white/20 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+  }
+  
+  .glass-light {
+    @apply bg-white/5 backdrop-blur-3xl border border-white/10 shadow-2xl;
+  }
+
+  .neon-glow-teal {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+  }
+
+  .neon-glow-lime {
+    box-shadow: 0 0 20px rgba(132, 204, 22, 0.5);
+  }
+}
+
+body {
+  @apply bg-emerald-950 text-emerald-50 font-sans antialiased overflow-x-hidden min-h-screen;
+  background-image: linear-gradient(rgba(6, 78, 59, 0.85), rgba(2, 44, 34, 0.95)), url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=2560&auto=format&fit=crop');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-color: #064E3B; /* Fallback */
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply font-display;
+}
