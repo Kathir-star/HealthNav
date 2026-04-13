@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, ArrowRight, Sparkles, Heart, Activity, Shield } from 'lucide-react';
+import { User, ArrowRight, Sparkles, Heart, Activity, Shield, Loader2 } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { authService } from '../services/authService';
 import { databaseService } from '../services/databaseService';
@@ -27,44 +27,53 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({ onComplete }
     } else if (step === 2 && age && weight) {
       setStep(3);
     } else if (step === 3) {
-      setStep(4);
-    } else if (step === 4) {
-      setLoading(true);
-      try {
-        const user = await authService.getCurrentUser();
-        if (user) {
-          await databaseService.upsertProfile(user.id, {
-            display_name: name,
-            email: user.email,
-            onboarding_completed: true,
-            terms_accepted: true,
-            profile_data: {
-              age: parseInt(age),
-              weight: parseFloat(weight),
-              gender,
-            },
-            health_data: {
-              conditions: medicalConditions.split(',').map(s => s.trim()).filter(Boolean),
-              allergies: allergies.split(',').map(s => s.trim()).filter(Boolean),
-            },
-            pregnancy_data: {
-              status: pregnancyStatus,
-            },
-            history_data: {
-              medicines: [],
-              scans: [],
-            },
-            emergency_data: {
-              contacts: [],
-            }
-          });
-        }
-        onComplete();
-      } catch (error) {
-        console.error('Error saving onboarding data:', error);
-      } finally {
-        setLoading(false);
+      if (gender === 'female') {
+        setStep(4);
+      } else {
+        // Skip pregnancy status for non-female users and submit
+        await handleSubmit();
       }
+    } else if (step === 4) {
+      await handleSubmit();
+    }
+  };
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const user = await authService.getCurrentUser();
+      if (user) {
+        await databaseService.upsertProfile(user.id, {
+          display_name: name,
+          email: user.email || '',
+          onboarding_completed: true,
+          terms_accepted: true,
+          profile_data: {
+            age: parseInt(age),
+            weight: parseFloat(weight),
+            gender,
+          },
+          health_data: {
+            conditions: medicalConditions.split(',').map(s => s.trim()).filter(Boolean),
+            allergies: allergies.split(',').map(s => s.trim()).filter(Boolean),
+          },
+          pregnancy_data: {
+            status: gender === 'female' ? pregnancyStatus : 'not_pregnant',
+          },
+          history_data: {
+            medicines: [],
+            scans: [],
+          },
+          emergency_data: {
+            contacts: [],
+          }
+        });
+        onComplete();
+      }
+    } catch (error) {
+      console.error('Error saving onboarding data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -226,9 +235,16 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({ onComplete }
 
               <button 
                 onClick={handleNext}
-                className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold neon-glow-teal flex items-center justify-center gap-2 hover:scale-[1.02] transition-all"
+                disabled={loading}
+                className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold neon-glow-teal flex items-center justify-center gap-2 hover:scale-[1.02] transition-all disabled:opacity-50"
               >
-                Next <ArrowRight className="w-5 h-5" />
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    {gender === 'female' ? 'Next' : 'Complete Setup'} <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
               </button>
             </GlassCard>
           </motion.div>
@@ -269,9 +285,15 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({ onComplete }
               <button 
                 onClick={handleNext}
                 disabled={loading}
-                className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold neon-glow-teal flex items-center justify-center gap-2 hover:scale-[1.02] transition-all"
+                className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold neon-glow-teal flex items-center justify-center gap-2 hover:scale-[1.02] transition-all disabled:opacity-50"
               >
-                {loading ? "Setting up..." : "Complete Setup"} <ArrowRight className="w-5 h-5" />
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    Complete Setup <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
               </button>
             </GlassCard>
           </motion.div>

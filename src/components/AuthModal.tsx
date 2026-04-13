@@ -25,8 +25,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
     try {
       if (provider === 'google') {
         await authService.signInWithGoogle();
-      } else {
-        console.warn('Apple login not fully implemented');
+      } else if (provider === 'apple') {
+        await authService.signInWithApple();
       }
       onClose();
     } catch (err: any) {
