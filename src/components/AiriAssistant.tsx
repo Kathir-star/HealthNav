@@ -1,11 +1,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, X, Mic, Send, Activity, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { cn } from '../lib/utils';
 import { GlassCard } from './GlassCard';
-// Firebase imports removed
 import { getAiriResponse } from '../services/geminiService';
-import { HealthProfile } from '../types';
 import { useProfile } from '../hooks/useProfile';
 
 interface Message {
@@ -254,12 +253,18 @@ export const AiriAssistant: React.FC<AiriAssistantProps> = ({
                     )}
                   >
                     <div className={cn(
-                      "max-w-[80%] p-3 rounded-2xl text-xs font-medium shadow-sm",
+                      "max-w-[90%] p-3 rounded-2xl text-xs font-medium shadow-sm",
                       msg.sender === 'user' 
                         ? "bg-emerald-500 text-white rounded-tr-none neon-glow-teal" 
                         : "bg-emerald-500/10 text-emerald-50 border border-emerald-500/20 rounded-tl-none"
                     )}>
-                      {msg.text}
+                      {msg.sender === 'airi' ? (
+                        <div className="markdown-body prose prose-invert prose-xs max-w-none">
+                          <ReactMarkdown>{msg.text}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        msg.text
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -336,14 +341,21 @@ export const AiriAssistant: React.FC<AiriAssistantProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all relative group",
-          isOpen ? "bg-red-500 rotate-90" : "bg-emerald-500 neon-glow-teal"
+          isOpen ? "bg-red-500 rotate-90" : "bg-emerald-500 neon-glow-teal",
+          airiState === 'urgent' && !isOpen && "ring-4 ring-red-500 animate-pulse"
         )}
       >
-        <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-20 group-hover:opacity-40" />
+        <div className={cn(
+          "absolute inset-0 rounded-full animate-ping opacity-20 group-hover:opacity-40",
+          airiState === 'urgent' ? "bg-red-500" : "bg-emerald-500"
+        )} />
         {isOpen ? (
           <X className="text-white w-8 h-8" />
         ) : (
-          <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white/40 bg-white">
+          <div className={cn(
+            "relative w-12 h-12 rounded-full overflow-hidden border-2 bg-white",
+            airiState === 'urgent' ? "border-red-500" : "border-white/40"
+          )}>
             <AiriMascot state={airiState} />
           </div>
         )}

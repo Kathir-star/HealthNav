@@ -1,14 +1,14 @@
 import React from 'react';
-import { motion } from 'motion/react';
+import { motion, HTMLMotionProps } from 'motion/react';
 import { cn } from '../lib/utils';
 
-interface GlassCardProps {
+interface GlassCardProps extends HTMLMotionProps<"div"> {
   children: React.ReactNode;
   className?: string;
   delay?: number;
 }
 
-export const GlassCard: React.FC<GlassCardProps> = ({ children, className, delay = 0 }) => {
+export const GlassCard: React.FC<GlassCardProps> = ({ children, className, delay = 0, ...props }) => {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   return (
@@ -20,6 +20,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({ children, className, delay
         "glass rounded-3xl p-6 relative overflow-hidden group",
         className
       )}
+      {...props}
     >
       {/* Reflection Sheen - only on desktop for performance */}
       {!isMobile && (

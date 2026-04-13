@@ -41,7 +41,8 @@ export const VitalsTab: React.FC = () => {
         calories: 0,
         sleepHours: 0,
         spO2: 0,
-        elevation: 0
+        elevation: 0,
+        timestamp: new Date().toISOString()
       });
       setIsResetting(false);
     }, 1000);

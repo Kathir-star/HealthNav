@@ -17,12 +17,18 @@ import {
   ToggleLeft,
   ToggleRight,
   Smartphone,
-  Languages
+  Languages,
+  Lock,
+  Eye,
+  EyeOff,
+  X,
+  Loader2
 } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { MOCK_PERMISSIONS } from '../constants';
 import { cn } from '../lib/utils';
 import { authService } from '../services/authService';
+import { toast } from 'sonner';
 
 interface SettingsTabProps {
   onOpenProfile: () => void;
@@ -37,10 +43,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
   const [isHealthConnectSyncing, setIsHealthConnectSyncing] = React.useState(false);
   const [isHealthConnectLinked, setIsHealthConnectLinked] = React.useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = React.useState(false);
+  const [newPassword, setNewPassword] = React.useState('');
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = React.useState(false);
 
   const filteredPermissions = permissions.filter(p => {
     if (p.id === 'activity') return detectedSensors.includes('accelerometer');
-    if (p.id === 'location') return true; // Always show location for navigation
+    if (p.id === 'location') return true; 
     if (p.id === 'sensors') return detectedSensors.includes('heartrate');
     if (p.id === 'devices') return detectedSensors.includes('bluetooth');
     return true;
@@ -49,8 +59,29 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
   const handleSignOut = async () => {
     try {
       await authService.signOut();
+      toast.success("Signed out successfully");
     } catch (error) {
       console.error("Error signing out:", error);
+      toast.error("Failed to sign out");
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    setIsUpdatingPassword(true);
+    try {
+      await authService.updatePassword(newPassword);
+      toast.success("Password updated successfully");
+      setIsPasswordModalOpen(false);
+      setNewPassword('');
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update password");
+    } finally {
+      setIsUpdatingPassword(false);
     }
   };
 
@@ -59,7 +90,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
       if (id === 'location') {
         const result = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
         if (result.state === 'denied') {
-          alert("Please enable location permissions in your browser settings.");
+          toast.error("Please enable location permissions in your browser settings.");
           return;
         }
         navigator.geolocation.getCurrentPosition(() => {}, () => {});
@@ -68,6 +99,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
       setPermissions(prev => prev.map(p => 
         p.id === id ? { ...p, status: p.status === 'granted' ? 'denied' : 'granted' } : p
       ));
+      toast.success(`${id.charAt(0).toUpperCase() + id.slice(1)} permission updated`);
     } catch (err) {
       console.error("Permission error:", err);
     }
@@ -75,16 +107,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
 
   const handleLanguageChange = () => {
     const langs = [
-      'English (Pan-Asia)', 'हिन्दी (Hindi)', 'বাংলা (Bengali)', 'తెలుగు (Telugu)', 'मराठी (Marathi)', 
-      'தமிழ் (Tamil)', 'اردو (Urdu)', 'ગુજરાતી (Gujarati)', 'ಕನ್ನಡ (Kannada)', 'മലയാളം (Malayalam)', 
-      'ਪੰਜਾਬੀ (Punjabi)', 'ଓଡ଼ିଆ (Odia)', 'অসমীয়া (Assamese)', 'मैथिली (Maithili)', 'संस्कृतम् (Sanskrit)',
-      '日本語 (Japanese)', '中文 (Chinese)', '한국어 (Korean)', 'Tiếng Việt (Vietnamese)', 'ไทย (Thai)',
-      'Bahasa Indonesia', 'Bahasa Melayu', 'Tagalog (Filipino)', 'Burmese', 'Khmer', 'Lao', 'Sinhala',
-      'Nepali', 'Dzongkha', 'Dhivehi'
+      'English (Pan-Asia)', 'हिन्दी (Hindi)', 'தமிழ் (Tamil)', '日本語 (Japanese)', '中文 (Chinese)'
     ];
     const currentIndex = langs.indexOf(language);
     const nextIndex = (currentIndex + 1) % langs.length;
     setLanguage(langs[nextIndex]);
+    toast.info(`Language set to ${langs[nextIndex]}`);
   };
 
   const handleConnectWearable = () => {
@@ -92,7 +120,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
     setTimeout(() => {
       setIsConnectingWearable(false);
       setConnectedDevice('HealthBand Pro v2');
-      alert("Connected to HealthBand Pro v2 via Bluetooth LE. Diagnosis complete.");
+      toast.success("Connected to HealthBand Pro v2");
     }, 3000);
   };
 
@@ -101,7 +129,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
     setTimeout(() => {
       setIsHealthConnectSyncing(false);
       setIsHealthConnectLinked(true);
-      alert("Health Connect synced successfully.");
+      toast.success("Health Connect synced successfully");
     }, 2500);
   };
 
@@ -110,7 +138,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
       title: "Account",
       items: [
         { icon: User, label: "Your Profile", sub: "Manage your health data", action: onOpenProfile },
-        { icon: Shield, label: "Privacy & Security", sub: "Data encryption settings", action: () => alert("Privacy settings are encrypted and locked.") },
+        { icon: Lock, label: "Change Password", sub: "Update your security", action: () => setIsPasswordModalOpen(true) },
+        { icon: Shield, label: "Privacy & Security", sub: "Data encryption settings", action: () => toast.info("Privacy settings are encrypted and locked.") },
       ]
     },
     {
@@ -120,12 +149,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
           icon: Bell, 
           label: "Notifications", 
           sub: notificationsEnabled ? "On" : "Off", 
-          action: () => setNotificationsEnabled(!notificationsEnabled),
+          action: () => {
+            setNotificationsEnabled(!notificationsEnabled);
+            toast.info(`Notifications ${!notificationsEnabled ? 'enabled' : 'disabled'}`);
+          },
           toggle: true,
           enabled: notificationsEnabled
         },
         { icon: Languages, label: "Language", sub: language, action: handleLanguageChange },
-        { icon: Camera, label: "Camera Settings", sub: "OCR & Vision calibration", action: () => alert("Camera calibrated.") },
+        { icon: Camera, label: "Camera Settings", sub: "OCR & Vision calibration", action: () => toast.success("Camera calibrated.") },
       ]
     }
   ];
@@ -147,6 +179,62 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
         <h2 className="text-2xl font-bold text-emerald-50">Settings</h2>
         <p className="text-sm text-emerald-100/60 font-medium">Configure your HealthNav AI experience</p>
       </div>
+
+      {/* Password Modal */}
+      <AnimatePresence>
+        {isPasswordModalOpen && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsPasswordModalOpen(false)}
+              className="absolute inset-0 bg-emerald-950/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-sm relative z-10"
+            >
+              <GlassCard className="p-8 border-emerald-500/20">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-white">Change Password</h3>
+                  <button onClick={() => setIsPasswordModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl">
+                    <X className="w-5 h-5 text-emerald-100/60" />
+                  </button>
+                </div>
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 w-5 h-5" />
+                    <input 
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="New Password" 
+                      className="w-full h-14 pl-12 pr-12 rounded-2xl glass border-emerald-500/10 focus:border-emerald-500 outline-none text-emerald-50"
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-100/40 hover:text-emerald-400"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  <button 
+                    disabled={isUpdatingPassword}
+                    className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold neon-glow-teal flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isUpdatingPassword ? <Loader2 className="w-5 h-5 animate-spin" /> : "Update Password"}
+                  </button>
+                </form>
+              </GlassCard>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Permissions Section */}
       <div className="space-y-3">

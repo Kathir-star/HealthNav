@@ -24,7 +24,9 @@ export const ArticleSection: React.FC<ArticleSectionProps> = ({
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <GlassCard key={i} className="h-64 animate-pulse bg-emerald-500/5 border-emerald-500/10" />
+            <GlassCard key={i} className="h-64 animate-pulse bg-emerald-500/5 border-emerald-500/10">
+              <div />
+            </GlassCard>
           ))}
         </div>
       </div>

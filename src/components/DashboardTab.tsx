@@ -22,6 +22,7 @@ import {
 import { cn } from '../lib/utils';
 import { authService } from '../services/authService';
 import { databaseService } from '../services/databaseService';
+import { toast } from 'sonner';
 
 interface DashboardTabProps {
   onSetupClick: () => void;
@@ -172,7 +173,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ onSetupClick }) => {
                   <div className="text-[10px] font-medium text-emerald-100/40">{apt.time}</div>
                 </div>
               </div>
-              <button className="w-full py-2 rounded-xl bg-lime-500/10 text-lime-400 text-[10px] font-bold uppercase tracking-widest hover:bg-lime-500/20 transition-colors">
+              <button 
+                onClick={() => toast.info("Appointment details are being retrieved from the hospital system...")}
+                className="w-full py-2 rounded-xl bg-lime-500/10 text-lime-400 text-[10px] font-bold uppercase tracking-widest hover:bg-lime-500/20 transition-colors"
+              >
                 View Details
               </button>
             </GlassCard>
@@ -222,7 +226,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ onSetupClick }) => {
                 <p className="text-xs text-emerald-100/70 leading-relaxed mb-4">
                   {tip.content}
                 </p>
-                <button className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                <button 
+                  onClick={() => toast.info("Full article is loading from our medical library...")}
+                  className="flex items-center gap-2 text-xs font-bold text-emerald-400"
+                >
                   Read Full Article <ExternalLink className="w-3 h-3" />
                 </button>
               </div>
