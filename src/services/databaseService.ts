@@ -14,14 +14,22 @@ export const databaseService = {
   },
 
   async upsertProfile(userId: string, profileData: any) {
-    const { data, error } = await supabase
-      .from('users')
-      .upsert({ id: userId, ...profileData })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .upsert({ id: userId, ...profileData })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Supabase Upsert Error:', error);
+        throw error;
+      }
+      return data;
+    } catch (err: any) {
+      console.error('Database Service Error (upsertProfile):', err);
+      throw err;
+    }
   },
 
   // Reminder operations
