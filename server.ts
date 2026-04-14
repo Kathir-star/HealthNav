@@ -11,8 +11,12 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://mlztrxjuhaneoidhmqsz.supabase.co';
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1senRyeGp1aGFuZW9pZGhtcXN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNTkzMTMsImV4cCI6MjA5MTYzNTMxM30.igOIpjJDV7MrCHeNsMKbSb80XwB2GK8lCCA4CX0mUd4';
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn("Supabase environment variables are missing!");
+}
 
 async function startServer() {
   const app = express();

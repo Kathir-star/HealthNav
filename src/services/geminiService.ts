@@ -1,5 +1,5 @@
 import { HealthProfile } from "../types";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../config/supabase";
 
 async function callAiApi(payload: any) {
   const response = await fetch("/api/ai", {
