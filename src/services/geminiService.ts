@@ -1,4 +1,5 @@
 import { HealthProfile } from "../types";
+import { supabase } from "../lib/supabase";
 
 async function callAiApi(payload: any) {
   const response = await fetch("/api/ai", {
@@ -86,6 +87,26 @@ If symptoms are critical (e.g. chest pain, severe bleeding, difficulty breathing
 * Always prioritize safety.
 * If urgency is CRITICAL -> advise calling 102 immediately.
 * Act as a real-time AI Guardian that prevents unsafe medicine usage, detects risks early, supports emergency decisions, and improves long-term health.`;
+
+export async function getChatResponse(message: string, conversationId: string | null, profile: HealthProfile | null) {
+  const session = await supabase.auth.getSession();
+  const token = session.data.session?.access_token;
+
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
+    body: JSON.stringify({ message, conversation_id: conversationId, profile }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to call Chat API");
+  }
+  return await response.json();
+}
 
 export async function getAiriResponse(message: string, profile: HealthProfile | null) {
   try {
