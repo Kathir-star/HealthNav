@@ -9,20 +9,23 @@ export function useProfile() {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    let profileSub: { unsubscribe: () => void } | null = null;
+
     const { data: { subscription } } = authService.onAuthStateChange(async (user) => {
       if (user) {
         try {
-          // Initial fetch
+          setLoading(true);
           const data = await databaseService.getProfile(user.id);
           setProfile(data as unknown as HealthProfile);
           setLoading(false);
 
-          // Real-time subscription for profile updates
-          const profileSub = await databaseService.subscribeToProfile(user.id, (payload) => {
+          if (profileSub) {
+            (profileSub as any).unsubscribe();
+          }
+          
+          profileSub = await databaseService.subscribeToProfile(user.id, (payload) => {
             setProfile(payload.new as unknown as HealthProfile);
           });
-
-          return () => profileSub.unsubscribe();
         } catch (err) {
           console.error("Profile fetch error:", err);
           setError(err as Error);
@@ -31,10 +34,17 @@ export function useProfile() {
       } else {
         setProfile(null);
         setLoading(false);
+        if (profileSub) {
+          (profileSub as any).unsubscribe();
+          profileSub = null;
+        }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (profileSub) (profileSub as any).unsubscribe();
+    };
   }, []);
 
   return { profile, loading, error };

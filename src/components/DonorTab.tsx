@@ -2,7 +2,7 @@ import React from 'react';
 import { Search, Heart, MapPin, Clock, ShieldCheck, Phone, Users, UserPlus, ExternalLink, Activity, Droplets, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GlassCard } from './GlassCard';
-import { cn } from '../lib/utils';
+import { cn } from '../utils/utils';
 
 interface DonorItem {
   id: string;

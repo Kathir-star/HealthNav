@@ -14,7 +14,7 @@ import {
   User,
   X
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn } from '../utils/utils';
 
 export type Tab = 'dashboard' | 'medicine' | 'care' | 'donor' | 'insurance' | 'healthy' | 'vitals' | 'settings' | 'profile';
 

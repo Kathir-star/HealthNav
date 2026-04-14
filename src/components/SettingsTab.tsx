@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { MOCK_PERMISSIONS } from '../constants';
-import { cn } from '../lib/utils';
+import { cn } from '../utils/utils';
 import { authService } from '../services/authService';
 import { toast } from 'sonner';
 

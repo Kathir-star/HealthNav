@@ -19,7 +19,7 @@ import {
   MOCK_ACTIVITIES, 
   MOCK_TIPS 
 } from '../constants';
-import { cn } from '../lib/utils';
+import { cn } from '../utils/utils';
 import { authService } from '../services/authService';
 import { databaseService } from '../services/databaseService';
 import { toast } from 'sonner';

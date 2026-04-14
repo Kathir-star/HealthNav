@@ -2,7 +2,7 @@ import React from 'react';
 import { Search, Stethoscope, Star, MapPin, Bed, Info, ExternalLink, Clock, Calendar, Sparkles, BookOpen, AlertCircle, Navigation, Phone } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GlassCard } from './GlassCard';
-import { cn } from '../lib/utils';
+import { cn } from '../utils/utils';
 import { ArticleSection } from './ArticleSection';
 import { getRecommendedArticles } from '../services/geminiService';
 import { getCurrentLocation, findNearbyHospitals } from '../services/locationService';

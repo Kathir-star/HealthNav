@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Shield, Activity, Heart, ArrowRight, CheckCircle2, Star, Menu, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { cn } from '../lib/utils';
+import { cn } from '../utils/utils';
 
 export const LandingPage: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);

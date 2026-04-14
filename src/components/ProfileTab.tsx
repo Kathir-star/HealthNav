@@ -176,4 +176,4 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ detectedSensors = [] }) 
   );
 };
 
-import { cn } from '../lib/utils';
+import { cn } from '../utils/utils';

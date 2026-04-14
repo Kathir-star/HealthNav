@@ -6,7 +6,7 @@ import { ArticleSection } from './ArticleSection';
 import { getRecommendedArticles, generateDietPlan } from '../services/geminiService';
 import { Article } from '../types';
 import { useProfile } from '../hooks/useProfile';
-import { cn } from '../lib/utils';
+import { cn } from '../utils/utils';
 
 interface Recipe {
   id: string;

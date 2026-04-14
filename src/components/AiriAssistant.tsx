@@ -4,11 +4,11 @@ import { Sparkles, X, Mic, Send, Activity, Loader2, Volume2, VolumeX, MoreVertic
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 
-import { cn } from '../lib/utils';
+import { cn } from '../utils/utils';
 import { GlassCard } from './GlassCard';
 import { getChatResponse } from '../services/geminiService';
 import { useProfile } from '../hooks/useProfile';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../config/supabase';
 
 // --- Type Definitions ---
 interface Message {

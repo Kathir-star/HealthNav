@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { MOCK_VITALS } from '../constants';
-import { cn } from '../lib/utils';
+import { cn } from '../utils/utils';
 
 export const VitalsTab: React.FC = () => {
   const [vitals, setVitals] = React.useState(MOCK_VITALS);
