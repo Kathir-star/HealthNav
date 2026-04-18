@@ -8,8 +8,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables. Please check your .env file.');
 }
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL and/or Anon Key are missing. Please check your environment variables.');
-}
+// if (!supabaseUrl || !supabaseAnonKey) {
+//   throw new Error('Supabase URL and/or Anon Key are missing. Please check your environment variables.');
+// }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder');
