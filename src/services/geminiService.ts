@@ -1,5 +1,5 @@
 import { HealthProfile } from "../types";
-import { supabase } from "../config/supabase";
+import { supabase, isSupabaseConfigured } from "../lib/supabase";
 
 async function callAiApi(payload: any) {
   const response = await fetch("/api/ai", {
@@ -8,7 +8,7 @@ async function callAiApi(payload: any) {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    const error = await response.json();
+    const error = await response.json().catch(() => ({ error: "AI request failed" }));
     throw new Error(error.error || "Failed to call AI API");
   }
   return await response.json();
@@ -89,20 +89,31 @@ If symptoms are critical (e.g. chest pain, severe bleeding, difficulty breathing
 * Act as a real-time AI Guardian that prevents unsafe medicine usage, detects risks early, supports emergency decisions, and improves long-term health.`;
 
 export async function getChatResponse(message: string, conversationId: string | null, profile: HealthProfile | null) {
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.access_token;
+  let token: string | undefined = undefined;
+  if (isSupabaseConfigured) {
+    try {
+      const session = await supabase.auth.getSession();
+      token = session.data.session?.access_token;
+    } catch {
+      // Ignore
+    }
+  }
+
+  const headers: Record<string, string> = { 
+    "Content-Type": "application/json" 
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   const response = await fetch("/api/chat", {
     method: "POST",
-    headers: { 
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    },
+    headers,
     body: JSON.stringify({ message, conversation_id: conversationId, profile }),
   });
 
   if (!response.ok) {
-    const error = await response.json();
+    const error = await response.json().catch(() => ({ error: "Chat endpoint failed" }));
     throw new Error(error.error || "Failed to call Chat API");
   }
   return await response.json();
@@ -313,5 +324,52 @@ export async function getRecommendedArticles(query: string) {
   } catch (error) {
     console.error("Article Recommendation Error:", error);
     return [];
+  }
+}
+
+export async function searchHospital(query: string) {
+  try {
+    const result = await callAiApi({
+      prompt: `Search for ${query} hospital in India. 
+      Provide real data in JSON format:
+      {
+          "name": "Full Name",
+          "loc": "Actual Address, City",
+          "beds": "Real Bed Capacity",
+          "avail": "Live Available Beds (Simulated)",
+          "img": "Direct URL of hospital building photo",
+          "link": "Official Website URL",
+          "specialists": "All departments available",
+          "airi_insight": "A professional AI insight about this hospital's quality",
+          "cost": "Cost Range (e.g. Premium, Affordable)",
+          "fee": "Consultation Fee",
+          "score": 90,
+          "badges": ["Specialty 1", "Specialty 2"]
+      }`,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          loc: { type: "string" },
+          beds: { type: "string" },
+          avail: { type: "string" },
+          img: { type: "string" },
+          link: { type: "string" },
+          specialists: { type: "string" },
+          airi_insight: { type: "string" },
+          cost: { type: "string" },
+          fee: { type: "string" },
+          score: { type: "number" },
+          badges: { type: "array", items: { type: "string" } }
+        },
+        required: ["name", "loc", "beds", "avail", "img", "link", "airi_insight", "specialists"]
+      }
+    });
+
+    return JSON.parse(result.text || "{}");
+  } catch (error) {
+    console.error("Hospital Search Error:", error);
+    return null;
   }
 }

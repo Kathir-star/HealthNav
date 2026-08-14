@@ -4,11 +4,11 @@ import { Sparkles, X, Mic, Send, Activity, Loader2, Volume2, VolumeX, MoreVertic
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 
-import { cn } from '../utils/utils';
+import { cn } from '../lib/utils';
 import { GlassCard } from './GlassCard';
 import { getChatResponse } from '../services/geminiService';
 import { useProfile } from '../hooks/useProfile';
-import { supabase } from '../config/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 // --- Type Definitions ---
 interface Message {
@@ -159,6 +159,25 @@ export const AiriAssistant: React.FC<AiriAssistantProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
+    const handleExternalMessage = (e: any) => {
+      const { content, role } = e.detail;
+      if (content) {
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          content,
+          role: role || 'assistant',
+          created_at: new Date().toISOString()
+        }]);
+        if (!isOpen) setIsOpen(true);
+        if (role !== 'user') speak(content);
+      }
+    };
+
+    window.addEventListener('airi-message', handleExternalMessage);
+    return () => window.removeEventListener('airi-message', handleExternalMessage);
+  }, [isOpen, isVoiceEnabled]);
+
+  useEffect(() => {
     if (isOpen) {
       fetchConversations();
     }
@@ -172,31 +191,42 @@ export const AiriAssistant: React.FC<AiriAssistantProps> = ({
     }
   }, [activeConversationId]);
 
-  const fetchConversations = async () => {
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    if (!isSupabaseConfigured) return {};
     try {
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
-      const response = await fetch("/api/conversations", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      return token ? { "Authorization": `Bearer ${token}` } : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const fetchConversations = async () => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch("/api/conversations", { headers });
+      if (!response.ok) return;
       const data = await response.json();
-      setConversations(data || []);
+      if (Array.isArray(data)) {
+        setConversations(data);
+      }
     } catch (err) {
-      console.error("Error fetching conversations:", err);
+      console.warn("Could not fetch conversations:", err);
     }
   };
 
   const fetchMessages = async (id: string) => {
     try {
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
-      const response = await fetch(`/api/messages?conversation_id=${id}`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/messages?conversation_id=${id}`, { headers });
+      if (!response.ok) return;
       const data = await response.json();
-      setMessages(data || []);
+      if (Array.isArray(data)) {
+        setMessages(data);
+      }
     } catch (err) {
-      console.error("Error fetching messages:", err);
+      console.warn("Could not fetch messages:", err);
     }
   };
 

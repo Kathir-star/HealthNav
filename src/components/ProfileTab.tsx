@@ -1,9 +1,10 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Activity, Heart, Zap, Flame, TrendingUp, Calendar, Clock, MapPin } from 'lucide-react';
+import { Activity, Heart, Zap, Flame, TrendingUp, Calendar, Clock, MapPin, ShieldCheck } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { authService } from '../services/authService';
 import { databaseService } from '../services/databaseService';
+import { toast } from 'sonner';
 
 interface ProfileTabProps {
   detectedSensors?: string[];
@@ -13,6 +14,24 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ detectedSensors = [] }) 
   const [userData, setUserData] = React.useState<any>(null);
   const [steps, setSteps] = React.useState(8432);
   const [user, setUser] = React.useState<any>(null);
+  const [profilePic, setProfilePic] = React.useState<string | null>(localStorage.getItem('healthnav_profile_pic'));
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const isOwner = userData?.display_name?.toLowerCase().includes('jaffer rilwaan') || user?.email === 'kathir.ven07@gmail.com';
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setProfilePic(result);
+        localStorage.setItem('healthnav_profile_pic', result);
+        toast.success("Profile picture updated!");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   React.useEffect(() => {
     const init = async () => {
@@ -69,19 +88,30 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ detectedSensors = [] }) 
     <div className="space-y-8 pb-24">
       <div className="flex items-center gap-6">
         <div className="relative group">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            accept="image/*" 
+            className="hidden" 
+          />
           <div className="w-24 h-24 rounded-3xl bg-emerald-500 flex items-center justify-center shadow-2xl shadow-emerald-500/20 overflow-hidden border-2 border-white/20">
-            {user?.user_metadata?.avatar_url ? (
+            {profilePic ? (
+              <img src={profilePic} alt="Profile" className="w-full h-full object-cover" />
+            ) : user?.user_metadata?.avatar_url ? (
               <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
             ) : (
               <span className="text-4xl font-black text-white">{userData?.display_name?.[0] || user?.email?.[0]?.toUpperCase()}</span>
             )}
           </div>
-          <button 
-            onClick={() => alert("Image upload feature coming soon!")}
-            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-3xl"
-          >
-            <span className="text-[10px] font-bold text-white uppercase tracking-widest">Update</span>
-          </button>
+          {isOwner && (
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-3xl"
+            >
+              <span className="text-[10px] font-bold text-white uppercase tracking-widest">Update</span>
+            </button>
+          )}
           <motion.div 
             animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
             transition={{ duration: 3, repeat: Infinity }}
@@ -91,7 +121,12 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ detectedSensors = [] }) 
           </motion.div>
         </div>
         <div>
-          <h2 className="text-3xl font-black text-white tracking-tight">{userData?.display_name || 'Health Explorer'}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-3xl font-black text-white tracking-tight">{userData?.display_name || 'Health Explorer'}</h2>
+            {isOwner && (
+              <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981] mt-1" title="Verified Owner" />
+            )}
+          </div>
           <p className="text-emerald-100/60 font-medium flex items-center gap-2">
             <Calendar className="w-4 h-4" /> Member since 2024
           </p>
@@ -176,4 +211,4 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ detectedSensors = [] }) 
   );
 };
 
-import { cn } from '../utils/utils';
+import { cn } from '../lib/utils';

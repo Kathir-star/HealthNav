@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Shield, Activity, Heart, ArrowRight, CheckCircle2, Star, Menu, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { cn } from '../utils/utils';
+import { cn } from '../lib/utils';
 
 export const LandingPage: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -28,7 +28,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <div className="hidden md:flex items-center gap-4">
-            <Link to="/auth/login" className="text-sm font-bold text-emerald-100/60 hover:text-white transition-colors">
+            <Link to="/auth" className="text-sm font-bold text-emerald-100/60 hover:text-white transition-colors">
               Sign In
             </Link>
             <Link 
@@ -61,7 +61,7 @@ export const LandingPage: React.FC = () => {
                 </a>
               ))}
               <div className="pt-6 space-y-4">
-                <Link to="/auth/login" className="block w-full py-4 rounded-2xl border border-white/10 text-white font-bold text-center">
+                <Link to="/auth" className="block w-full py-4 rounded-2xl border border-white/10 text-white font-bold text-center">
                   Sign In
                 </Link>
                 <Link to="/auth" className="block w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold neon-glow-teal text-center">

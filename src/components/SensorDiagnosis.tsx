@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Activity, Bluetooth, Cpu, Zap, ShieldCheck, Smartphone, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { cn } from '../utils/utils';
+import { cn } from '../lib/utils';
 
 interface SensorDiagnosisProps {
   onComplete: (detectedSensors: string[]) => void;

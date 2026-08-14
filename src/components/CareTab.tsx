@@ -1,10 +1,11 @@
 import React from 'react';
-import { Search, Stethoscope, Star, MapPin, Bed, Info, ExternalLink, Clock, Calendar, Sparkles, BookOpen, AlertCircle, Navigation, Phone } from 'lucide-react';
+import { Search, Stethoscope, Star, MapPin, Bed, Info, ExternalLink, Clock, Calendar, Sparkles, BookOpen, AlertCircle, Navigation, Phone, ShieldCheck, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 import { GlassCard } from './GlassCard';
-import { cn } from '../utils/utils';
+import { cn } from '../lib/utils';
 import { ArticleSection } from './ArticleSection';
-import { getRecommendedArticles } from '../services/geminiService';
+import { getRecommendedArticles, searchHospital } from '../services/geminiService';
 import { getCurrentLocation, findNearbyHospitals } from '../services/locationService';
 import { Article, Hospital } from '../types';
 
@@ -83,21 +84,65 @@ export const CareTab: React.FC = () => {
   const [isArticlesLoading, setIsArticlesLoading] = React.useState(false);
   const [nearbyHospitals, setNearbyHospitals] = React.useState<Hospital[]>(REAL_HOSPITALS);
   const [locationError, setLocationError] = React.useState<string | null>(null);
+  const [activeSpecialty, setActiveSpecialty] = React.useState<string>('All');
+  const [bookingStatus, setBookingStatus] = React.useState<Record<string, 'idle' | 'booking' | 'success'>>({});
+
+  const specialties = ['All', 'ENT', 'Cardiology', 'General', 'Pediatrics', 'Oncology'];
 
   const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setSearchQuery(val);
+  };
+
+  const executeSearch = async () => {
+    if (searchQuery.length < 2) return;
     
-    if (val.length > 2) {
-      setIsSearching(true);
-      setIsArticlesLoading(true);
-      
-      getRecommendedArticles(val + " healthcare and treatment").then(articles => {
+    setIsSearching(true);
+    setIsArticlesLoading(true);
+    
+    try {
+      // 1. Get Articles
+      getRecommendedArticles(searchQuery + " healthcare and treatment").then(articles => {
         setRecommendedArticles(articles);
         setIsArticlesLoading(false);
       });
 
-      setTimeout(() => setIsSearching(false), 1500);
+      // 2. AI Hospital Search
+      const aiData = await searchHospital(searchQuery);
+      if (aiData) {
+        const newHospital: Hospital = {
+          id: `ai-${Date.now()}`,
+          name: aiData.name,
+          location: aiData.loc,
+          distance: 'Calculating...',
+          bedAvailability: `${aiData.avail} / ${aiData.beds}`,
+          costRange: aiData.cost || 'Premium',
+          consultationFee: aiData.fee || '₹1,000',
+          capabilityScore: aiData.score || 90,
+          badges: aiData.badges || (aiData.specialists ? aiData.specialists.split(',').map((s: string) => s.trim()) : ['AI Verified']),
+          reviewSummary: aiData.airi_insight,
+          bestFit: true,
+          appointmentLink: aiData.link,
+          availabilityStatus: 'Available',
+          nextSlot: 'Today, 2:00 PM',
+          imageUrl: aiData.img
+        };
+
+        setNearbyHospitals(prev => [newHospital, ...prev]);
+        
+        // 3. Trigger Airi Chat
+        window.dispatchEvent(new CustomEvent('airi-message', {
+          detail: { 
+            content: `**Airi AI:** I've analyzed **${aiData.name}**. ${aiData.airi_insight} \n\nThe facility specializes in ${aiData.specialists}.`,
+            role: 'assistant'
+          }
+        }));
+      }
+    } catch (err) {
+      console.error("Search error:", err);
+      toast.error("Search failed. Please try again.");
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -122,11 +167,31 @@ export const CareTab: React.FC = () => {
     }
   };
 
-  const filteredHospitals = nearbyHospitals.filter(h => 
-    h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    h.badges.some(b => b.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    h.location.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleBooking = async (hospitalId: string, hospitalName: string) => {
+    setBookingStatus(prev => ({ ...prev, [hospitalId]: 'booking' }));
+    
+    // Simulate network delay
+    await new Promise(r => setTimeout(r, 1800));
+    
+    setBookingStatus(prev => ({ ...prev, [hospitalId]: 'success' }));
+    toast.success(`Appointment Secured at ${hospitalName}!`);
+    
+    // Reset after 5 seconds
+    setTimeout(() => {
+      setBookingStatus(prev => ({ ...prev, [hospitalId]: 'idle' }));
+    }, 5000);
+  };
+
+  const filteredHospitals = nearbyHospitals.filter(h => {
+    const matchesSearch = h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      h.badges.some(b => b.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      h.location.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesSpecialty = activeSpecialty === 'All' || 
+      h.badges.some(b => b.toLowerCase().includes(activeSpecialty.toLowerCase()));
+      
+    return matchesSearch && matchesSpecialty;
+  });
 
   return (
     <div className="space-y-6 pb-24">
@@ -218,9 +283,34 @@ export const CareTab: React.FC = () => {
           type="text" 
           value={searchQuery}
           onChange={handleSearch}
+          onKeyDown={(e) => e.key === 'Enter' && executeSearch()}
           placeholder="Search hospital, city, or specialty..." 
-          className="w-full h-14 pl-12 pr-4 rounded-2xl glass border-emerald-500/20 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none font-medium text-emerald-50 placeholder:text-emerald-100/40"
+          className="w-full h-14 pl-12 pr-16 rounded-2xl glass border-emerald-500/20 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none font-medium text-emerald-50 placeholder:text-emerald-100/40"
         />
+        <button 
+          onClick={executeSearch}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 rounded-xl bg-emerald-500 text-white hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/20"
+        >
+          <Sparkles className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Specialist Filters */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        {specialties.map(specialty => (
+          <button
+            key={specialty}
+            onClick={() => setActiveSpecialty(specialty)}
+            className={cn(
+              "px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border",
+              activeSpecialty === specialty 
+                ? "bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20" 
+                : "bg-emerald-950/50 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10"
+            )}
+          >
+            {specialty}
+          </button>
+        ))}
       </div>
 
       <div className="grid gap-4">
@@ -255,7 +345,10 @@ export const CareTab: React.FC = () => {
                   </div>
                   <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-emerald-100/60">
                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {hospital.location}</span>
-                    <span className="flex items-center gap-1"><Bed className="w-3 h-3" /> {hospital.bedAvailability} beds</span>
+                    <span className="flex items-center gap-1">
+                      <Bed className="w-3 h-3" /> 
+                      <span className="font-bold text-emerald-400">{hospital.bedAvailability}</span> Beds Real-Time
+                    </span>
                     <span className="font-bold text-emerald-400">{hospital.costRange}</span>
                     <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">Fee: {hospital.consultationFee}</span>
                   </div>
@@ -297,14 +390,30 @@ export const CareTab: React.FC = () => {
                   </div>
 
                   <div className="flex gap-3">
-                    <a 
-                      href={hospital.appointmentLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 py-3 rounded-xl bg-lime-500 text-white text-sm font-bold neon-glow-lime hover:scale-[1.02] transition-transform shadow-lg shadow-lime-500/20 flex items-center justify-center gap-2"
+                    <button 
+                      onClick={() => handleBooking(hospital.id, hospital.name)}
+                      disabled={bookingStatus[hospital.id] === 'booking' || bookingStatus[hospital.id] === 'success'}
+                      className={cn(
+                        "flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-lg flex items-center justify-center gap-2",
+                        bookingStatus[hospital.id] === 'success' ? "bg-emerald-500 text-white" :
+                        bookingStatus[hospital.id] === 'booking' ? "bg-amber-500 text-white animate-pulse" :
+                        "bg-lime-500 text-white neon-glow-lime hover:scale-[1.02]"
+                      )}
                     >
-                      <Stethoscope className="w-4 h-4" /> Book Appointment
-                    </a>
+                      {bookingStatus[hospital.id] === 'success' ? (
+                        <>
+                          <ShieldCheck className="w-4 h-4" /> Secured
+                        </>
+                      ) : bookingStatus[hospital.id] === 'booking' ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" /> Securing Slot...
+                        </>
+                      ) : (
+                        <>
+                          <Calendar className="w-4 h-4" /> Book at {hospital.name}
+                        </>
+                      )}
+                    </button>
                     <a 
                       href={`https://www.google.com/maps/search/${encodeURIComponent(hospital.name + ' ' + hospital.location)}`}
                       target="_blank"

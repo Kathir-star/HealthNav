@@ -17,36 +17,47 @@ import {
   ToggleLeft,
   ToggleRight,
   Smartphone,
-  Languages,
-  Lock,
-  Eye,
-  EyeOff,
-  X,
-  Loader2
+  Languages
 } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { MOCK_PERMISSIONS } from '../constants';
-import { cn } from '../utils/utils';
+import { cn } from '../lib/utils';
 import { authService } from '../services/authService';
 import { toast } from 'sonner';
 
 interface SettingsTabProps {
   onOpenProfile: () => void;
   detectedSensors?: string[];
+  language: string;
+  onLanguageChange: (lang: string) => void;
 }
 
-export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detectedSensors = [] }) => {
+export const SettingsTab: React.FC<SettingsTabProps> = ({ 
+  onOpenProfile, 
+  detectedSensors = [],
+  language,
+  onLanguageChange
+}) => {
   const [permissions, setPermissions] = React.useState(MOCK_PERMISSIONS);
-  const [language, setLanguage] = React.useState('English (Pan-Asia)');
   const [isConnectingWearable, setIsConnectingWearable] = React.useState(false);
   const [connectedDevice, setConnectedDevice] = React.useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
   const [isHealthConnectSyncing, setIsHealthConnectSyncing] = React.useState(false);
   const [isHealthConnectLinked, setIsHealthConnectLinked] = React.useState(false);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = React.useState(false);
-  const [newPassword, setNewPassword] = React.useState('');
-  const [showPassword, setShowPassword] = React.useState(false);
-  const [isUpdatingPassword, setIsUpdatingPassword] = React.useState(false);
+
+  const languages: Record<string, string> = {
+    'en': 'English (India)',
+    'ta': 'தமிழ் (Tamil)',
+    'hi': 'हिन्दी (Hindi)'
+  };
+
+  const handleLanguageCycle = () => {
+    const codes = ['en', 'ta', 'hi'];
+    const currentIndex = codes.indexOf(language);
+    const nextIndex = (currentIndex + 1) % codes.length;
+    onLanguageChange(codes[nextIndex]);
+    toast.info(`Language set to ${languages[codes[nextIndex]]}`);
+  };
 
   const filteredPermissions = permissions.filter(p => {
     if (p.id === 'activity') return detectedSensors.includes('accelerometer');
@@ -59,29 +70,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
   const handleSignOut = async () => {
     try {
       await authService.signOut();
-      toast.success("Signed out successfully");
+      localStorage.removeItem('healthnav_profile_pic');
+      toast.success("Health session reset to default profile");
     } catch (error) {
-      console.error("Error signing out:", error);
-      toast.error("Failed to sign out");
-    }
-  };
-
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters");
-      return;
-    }
-    setIsUpdatingPassword(true);
-    try {
-      await authService.updatePassword(newPassword);
-      toast.success("Password updated successfully");
-      setIsPasswordModalOpen(false);
-      setNewPassword('');
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update password");
-    } finally {
-      setIsUpdatingPassword(false);
+      console.error("Error resetting session:", error);
+      toast.error("Failed to reset session");
     }
   };
 
@@ -103,16 +96,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
     } catch (err) {
       console.error("Permission error:", err);
     }
-  };
-
-  const handleLanguageChange = () => {
-    const langs = [
-      'English (Pan-Asia)', 'हिन्दी (Hindi)', 'தமிழ் (Tamil)', '日本語 (Japanese)', '中文 (Chinese)'
-    ];
-    const currentIndex = langs.indexOf(language);
-    const nextIndex = (currentIndex + 1) % langs.length;
-    setLanguage(langs[nextIndex]);
-    toast.info(`Language set to ${langs[nextIndex]}`);
   };
 
   const handleConnectWearable = () => {
@@ -138,7 +121,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
       title: "Account",
       items: [
         { icon: User, label: "Your Profile", sub: "Manage your health data", action: onOpenProfile },
-        { icon: Lock, label: "Change Password", sub: "Update your security", action: () => setIsPasswordModalOpen(true) },
         { icon: Shield, label: "Privacy & Security", sub: "Data encryption settings", action: () => toast.info("Privacy settings are encrypted and locked.") },
       ]
     },
@@ -156,7 +138,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
           toggle: true,
           enabled: notificationsEnabled
         },
-        { icon: Languages, label: "Language", sub: language, action: handleLanguageChange },
+        { icon: Languages, label: "Language", sub: languages[language] || 'English', action: handleLanguageCycle },
         { icon: Camera, label: "Camera Settings", sub: "OCR & Vision calibration", action: () => toast.success("Camera calibrated.") },
       ]
     }
@@ -180,64 +162,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenProfile, detecte
         <p className="text-sm text-emerald-100/60 font-medium">Configure your HealthNav AI experience</p>
       </div>
 
-      {/* Password Modal */}
-      <AnimatePresence>
-        {isPasswordModalOpen && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsPasswordModalOpen(false)}
-              className="absolute inset-0 bg-emerald-950/80 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="w-full max-w-sm relative z-10"
-            >
-              <GlassCard className="p-8 border-emerald-500/20">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-white">Change Password</h3>
-                  <button onClick={() => setIsPasswordModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl">
-                    <X className="w-5 h-5 text-emerald-100/60" />
-                  </button>
-                </div>
-                <form onSubmit={handleUpdatePassword} className="space-y-4">
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 w-5 h-5" />
-                    <input 
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="New Password" 
-                      className="w-full h-14 pl-12 pr-12 rounded-2xl glass border-emerald-500/10 focus:border-emerald-500 outline-none text-emerald-50"
-                    />
-                    <button 
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-100/40 hover:text-emerald-400"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                  <button 
-                    disabled={isUpdatingPassword}
-                    className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold neon-glow-teal flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {isUpdatingPassword ? <Loader2 className="w-5 h-5 animate-spin" /> : "Update Password"}
-                  </button>
-                </form>
-              </GlassCard>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* Permissions Section */}
       <div className="space-y-3">
+
         <h3 className="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.2em] ml-2">
           Detected Sensors & Permissions
         </h3>

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Sidebar, Tab } from './components/Sidebar';
-import { Sparkles, Shield, Activity, Heart, Loader2, X, Menu } from 'lucide-react';
+import { Activity, Heart, Menu } from 'lucide-react';
 import { MedicineTab } from './components/MedicineTab';
 import { CareTab } from './components/CareTab';
 import { DonorTab } from './components/DonorTab';
@@ -20,33 +20,11 @@ import { FeedbackModal } from './components/FeedbackModal';
 import { TermsModal } from './components/TermsModal';
 import { OnboardingSurvey } from './components/OnboardingSurvey';
 import { SensorDiagnosis } from './components/SensorDiagnosis';
-import { GlassCard } from './components/GlassCard';
-import { LandingPage } from './pages/LandingPage';
+import { cn } from './lib/utils';
 
-import { authService } from './services/authService';
+import { authService, DEFAULT_GUEST_USER } from './services/authService';
 import { databaseService } from './services/databaseService';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-import { AuthPage } from './pages/AuthPage';
-
-const ProtectedRoute = ({ children, user, isAuthReady }: { children: React.ReactNode, user: SupabaseUser | null, isAuthReady: boolean }) => {
-  if (!isAuthReady) {
-    return (
-      <div className="fixed inset-0 z-[300] bg-emerald-950 flex items-center justify-center">
-        <motion.div 
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full"
-        />
-      </div>
-    );
-  }
-  
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-  
-  return <>{children}</>;
-};
 
 const AppContent = ({ user }: { user: SupabaseUser | null }) => {
   const [activeTab, setActiveTab] = React.useState<Tab>('dashboard');
@@ -54,21 +32,69 @@ const AppContent = ({ user }: { user: SupabaseUser | null }) => {
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
   const [isTermsOpen, setIsTermsOpen] = React.useState(false);
   const [isCameraOpen, setIsCameraOpen] = React.useState(false);
-  const [airiMessage, setAiriMessage] = React.useState<string | undefined>("Welcome back! I'm Airi, your health guide.");
+  const [airiMessage, setAiriMessage] = React.useState<string | undefined>("Welcome to HealthNav! I'm Airi, your real-time health guide.");
   const [airiState, setAiriState] = React.useState<'calm' | 'attentive' | 'urgent'>('calm');
   const [isOnboardingNeeded, setIsOnboardingNeeded] = React.useState(false);
   const [isDiagnosing, setIsDiagnosing] = React.useState(false);
-  const [detectedSensors, setDetectedSensors] = React.useState<string[]>([]);
+  const [detectedSensors, setDetectedSensors] = React.useState<string[]>(['accelerometer', 'gyroscope']);
+  const [language, setLanguage] = React.useState(localStorage.getItem('healthnav_lang') || 'en');
+
+  const handleLanguageChange = (lang: string) => {
+    setLanguage(lang);
+    localStorage.setItem('healthnav_lang', lang);
+    document.body.style.opacity = '0.5';
+    setTimeout(() => {
+      document.body.style.opacity = '1';
+    }, 300);
+  };
+  
+  // Pull to Refresh Logic
+  const [startY, setStartY] = React.useState(0);
+  const [pullDistance, setPullDistance] = React.useState(0);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const refreshThreshold = 150;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      setStartY(e.touches[0].pageY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (window.scrollY === 0 && startY > 0) {
+      const currentY = e.touches[0].pageY;
+      const dist = currentY - startY;
+      if (dist > 0) {
+        setPullDistance(Math.min(dist / 2, refreshThreshold));
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullDistance > refreshThreshold * 0.8) {
+      executeRefresh();
+    } else {
+      setPullDistance(0);
+      setStartY(0);
+    }
+  };
+
+  const executeRefresh = () => {
+    setIsRefreshing(true);
+    setPullDistance(refreshThreshold / 2);
+    
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  };
 
   React.useEffect(() => {
-    if (user) {
+    if (user && user.id !== DEFAULT_GUEST_USER.id) {
       const checkOnboarding = async () => {
         try {
           const profile = await databaseService.getProfile(user.id);
           if (profile) {
             setIsOnboardingNeeded(!profile.onboarding_completed);
-          } else {
-            setIsOnboardingNeeded(true);
           }
         } catch (error) {
           console.error('Error fetching profile:', error);
@@ -98,7 +124,31 @@ const AppContent = ({ user }: { user: SupabaseUser | null }) => {
   };
 
   return (
-    <div className="min-h-screen relative flex flex-col lg:flex-row overflow-x-hidden">
+    <div 
+      className="min-h-screen relative flex flex-col lg:flex-row overflow-x-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull to Refresh Indicator */}
+      <div 
+        className={cn(
+          "fixed top-0 left-1/2 -translate-x-1/2 z-[1000] flex items-center justify-center transition-all duration-200",
+          isRefreshing ? "top-8" : pullDistance > 0 ? `top-[${pullDistance - 50}px]` : "-top-16"
+        )}
+        style={{ 
+          top: isRefreshing ? '32px' : pullDistance > 0 ? `${pullDistance - 50}px` : '-64px',
+          transform: `translateX(-50%) rotate(${pullDistance * 2}deg)`
+        }}
+      >
+        <div className={cn(
+          "w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center shadow-2xl neon-glow-teal",
+          isRefreshing && "animate-spin"
+        )}>
+          <Activity className="text-emerald-950 w-6 h-6 stroke-[3]" />
+        </div>
+      </div>
+
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-16 glass border-b border-white/10 z-[80] flex items-center justify-between px-6">
         <div className="flex items-center gap-3">
@@ -157,6 +207,8 @@ const AppContent = ({ user }: { user: SupabaseUser | null }) => {
                 <SettingsTab 
                   onOpenProfile={() => setActiveTab('profile')} 
                   detectedSensors={detectedSensors}
+                  language={language}
+                  onLanguageChange={handleLanguageChange}
                 />
               )}
             </motion.div>
@@ -206,45 +258,25 @@ const AppContent = ({ user }: { user: SupabaseUser | null }) => {
 };
 
 export default function App() {
-  const [user, setUser] = React.useState<SupabaseUser | null>(null);
-  const [isAuthReady, setIsAuthReady] = React.useState(false);
+  const [user, setUser] = React.useState<SupabaseUser | null>(DEFAULT_GUEST_USER as any);
 
   React.useEffect(() => {
     const { data: { subscription } } = authService.onAuthStateChange((currentUser) => {
-      setUser(currentUser);
-      setIsAuthReady(true);
+      setUser(currentUser || (DEFAULT_GUEST_USER as any));
     });
-    return () => subscription.unsubscribe();
+    return () => subscription?.unsubscribe?.();
   }, []);
-
-  if (!isAuthReady) {
-    return (
-      <div className="fixed inset-0 z-[300] bg-emerald-950 flex items-center justify-center">
-        <motion.div 
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full"
-        />
-      </div>
-    );
-  }
 
   return (
     <BrowserRouter>
       <Toaster position="top-center" richColors />
       <Routes>
-        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
-        <Route path="/auth/*" element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute user={user} isAuthReady={isAuthReady}>
-              <AppContent user={user} />
-            </ProtectedRoute>
-          } 
-        />
+        <Route path="/" element={<AppContent user={user} />} />
+        <Route path="/dashboard" element={<AppContent user={user} />} />
+        <Route path="/auth/*" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
 }
+

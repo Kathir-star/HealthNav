@@ -2,9 +2,9 @@ import React from 'react';
 import { Search, Pill, ArrowUpRight, ArrowDownRight, Minus, CheckCircle2, Camera, X, Info, ShoppingCart, Clock, ExternalLink, Loader2, Sparkles, BookOpen, ShieldCheck, AlertTriangle, XCircle, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
-import { supabase } from '../config/supabase';
+import { databaseService } from '../services/databaseService';
 import { GlassCard } from './GlassCard';
-import { cn } from '../utils/utils';
+import { cn } from '../lib/utils';
 import { ArticleSection } from './ArticleSection';
 import { getRecommendedArticles, getAiriResponse } from '../services/geminiService';
 import { Article } from '../types';
@@ -150,24 +150,73 @@ export const MedicineTab: React.FC = () => {
 
   const [reminders, setReminders] = React.useState<any[]>([]);
   const [isAddingMed, setIsAddingMed] = React.useState(false);
-  const [newMed, setNewMed] = React.useState({ name: '', dosage: '', time: 'Morning' });
+  const [newMed, setNewMed] = React.useState({ name: '', dosage: '', time: '', sound: 'Zen' });
+  const audioPlayer = React.useRef<HTMLAudioElement | null>(null);
+
+  const alarmSounds: Record<string, string> = {
+    'Zen': 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
+    'Chime': 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
+    'Nature': 'https://assets.mixkit.co/active_storage/sfx/2530/2530-preview.mp3'
+  };
 
   React.useEffect(() => {
-    if (profile) {
-      fetchReminders();
+    audioPlayer.current = new Audio();
+    
+    const interval = setInterval(() => {
+      const now = new Date();
+      reminders.forEach(med => {
+        if (!med.taken && med.reminder_time) {
+          const reminderTime = new Date(med.reminder_time);
+          // Check if it's time (within 1 minute)
+          if (Math.abs(now.getTime() - reminderTime.getTime()) < 60000 && !med.triggered) {
+            playAlarm(med);
+          }
+        }
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [reminders]);
+
+  const playAlarm = (med: any) => {
+    if (audioPlayer.current) {
+      audioPlayer.current.src = alarmSounds[med.sound || 'Zen'];
+      audioPlayer.current.play().catch(e => console.error("Audio play error:", e));
     }
+    
+    toast.custom((t) => (
+      <div className="bg-emerald-950 border border-emerald-500 p-6 rounded-2xl shadow-2xl neon-glow-teal flex flex-col items-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center animate-bounce">
+          <Clock className="w-8 h-8 text-emerald-400" />
+        </div>
+        <div className="text-center">
+          <h3 className="text-xl font-bold text-emerald-50">🔔 REMINDER: {med.medicine_name}</h3>
+          <p className="text-emerald-100/60">It is time to take your medication ({med.dosage}).</p>
+        </div>
+        <button 
+          onClick={() => {
+            audioPlayer.current?.pause();
+            toggleTaken(med.id, false);
+            toast.dismiss(t);
+          }}
+          className="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold hover:scale-105 transition-transform"
+        >
+          I've Taken It
+        </button>
+      </div>
+    ), { duration: Infinity });
+
+    // Mark as triggered locally to avoid multiple alerts
+    setReminders(prev => prev.map(r => r.id === med.id ? { ...r, triggered: true } : r));
+  };
+
+  React.useEffect(() => {
+    fetchReminders();
   }, [profile]);
 
   const fetchReminders = async () => {
     try {
-      const { data, error } = await supabase
-        .from('reminders')
-        .select('*')
-        .eq('user_id', profile?.uid)
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
+      const data = await databaseService.getReminders(profile?.uid);
       setReminders(data || []);
     } catch (err) {
       console.error("Error fetching reminders:", err);
@@ -176,23 +225,19 @@ export const MedicineTab: React.FC = () => {
 
   const handleAddMed = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMed.name || !newMed.dosage) return;
+    if (!newMed.name || !newMed.dosage || !newMed.time) return;
 
     try {
-      const { error } = await supabase
-        .from('reminders')
-        .insert([{
-          user_id: profile?.uid,
-          medicine_name: newMed.name,
-          dosage: newMed.dosage,
-          time: newMed.time,
-          taken: false
-        }]);
+      await databaseService.addReminder(profile?.uid, {
+        name: newMed.name,
+        dosage: newMed.dosage,
+        time: newMed.time,
+        sound: newMed.sound
+      });
 
-      if (error) throw error;
       toast.success("Medicine added to your tracker!");
       setIsAddingMed(false);
-      setNewMed({ name: '', dosage: '', time: 'Morning' });
+      setNewMed({ name: '', dosage: '', time: '', sound: 'Zen' });
       fetchReminders();
     } catch (err) {
       console.error("Error adding medicine:", err);
@@ -202,12 +247,7 @@ export const MedicineTab: React.FC = () => {
 
   const handleDeleteMed = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('reminders')
-        .update({ is_deleted: true })
-        .eq('id', id);
-
-      if (error) throw error;
+      await databaseService.deleteReminder(id);
       setReminders(prev => prev.filter(r => r.id !== id));
       toast.success("Medicine removed.");
     } catch (err) {
@@ -217,15 +257,7 @@ export const MedicineTab: React.FC = () => {
 
   const toggleTaken = async (id: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('reminders')
-        .update({ 
-          taken: !currentStatus,
-          last_taken_date: !currentStatus ? new Date().toISOString() : null
-        })
-        .eq('id', id);
-
-      if (error) throw error;
+      await databaseService.toggleReminder(id, currentStatus);
       setReminders(prev => prev.map(r => r.id === id ? { ...r, taken: !currentStatus } : r));
     } catch (err) {
       console.error("Error updating status:", err);
@@ -269,7 +301,9 @@ export const MedicineTab: React.FC = () => {
                 </button>
                 <div>
                   <h4 className="font-bold text-emerald-50">{med.medicine_name}</h4>
-                  <p className="text-xs text-emerald-100/60">{med.dosage} • {med.time}</p>
+                  <p className="text-xs text-emerald-100/60">
+                    {med.dosage} • {med.reminder_time ? new Date(med.reminder_time).toLocaleString() : 'As Needed'}
+                  </p>
                 </div>
               </div>
               <button 
@@ -324,16 +358,24 @@ export const MedicineTab: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5">Reminder Time</label>
-                    <select 
+                    <input 
+                      type="datetime-local" 
+                      required
                       value={newMed.time}
                       onChange={e => setNewMed({...newMed, time: e.target.value})}
+                      className="w-full h-12 px-4 rounded-xl glass border-emerald-500/20 text-emerald-50 outline-none focus:border-emerald-500 [color-scheme:dark]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5">Alarm Sound</label>
+                    <select 
+                      value={newMed.sound}
+                      onChange={e => setNewMed({...newMed, sound: e.target.value})}
                       className="w-full h-12 px-4 rounded-xl glass border-emerald-500/20 text-emerald-50 outline-none focus:border-emerald-500 bg-emerald-900"
                     >
-                      <option>Morning</option>
-                      <option>Afternoon</option>
-                      <option>Evening</option>
-                      <option>Night</option>
-                      <option>As Needed</option>
+                      <option value="Zen">Zen Garden (Peaceful)</option>
+                      <option value="Chime">Soft Chime</option>
+                      <option value="Nature">Morning Birds</option>
                     </select>
                   </div>
                   <button 

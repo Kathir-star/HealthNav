@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'motion/react';
+import { motion, type Variants } from 'motion/react';
 import { 
   Activity, 
   Footprints, 
@@ -16,8 +16,45 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { GlassCard } from './GlassCard';
+import { VitalsTrendAnalysis } from './VitalsTrendAnalysis';
 import { MOCK_VITALS } from '../constants';
-import { cn } from '../utils/utils';
+import { cn } from '../lib/utils';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05
+    }
+  }
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 20, scale: 0.97 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.45,
+      ease: "easeOut"
+    }
+  }
+};
+
+const sectionVariants: Variants = {
+  hidden: { opacity: 0, y: 25 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: "easeOut"
+    }
+  }
+};
 
 export const VitalsTab: React.FC = () => {
   const [vitals, setVitals] = React.useState(MOCK_VITALS);
@@ -49,95 +86,127 @@ export const VitalsTab: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-24">
-      <div className="flex items-center justify-between relative z-10">
-        <div className="flex flex-col gap-2">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-8 pb-24"
+    >
+      {/* Header Section */}
+      <motion.div variants={itemVariants} className="flex items-center justify-between relative z-10">
+        <div className="flex flex-col gap-1.5">
           <h2 className="text-2xl font-bold text-white">Vitals & Movement</h2>
-          <p className="text-sm text-white/60 font-medium">Real-time sensor data from your devices</p>
+          <p className="text-sm text-white/60 font-medium">Real-time sensor telemetry and physiological dynamics</p>
         </div>
-        <button 
+        <motion.button 
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.96 }}
           onClick={handleReset}
           disabled={isResetting}
-          className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
+          className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest cursor-pointer shadow-lg shadow-black/20"
         >
           <RotateCcw className={cn("w-4 h-4", isResetting && "animate-spin")} />
           Reset Data
-        </button>
-      </div>
+        </motion.button>
+      </motion.div>
 
       {/* AI Insight Banner */}
-      <GlassCard className="p-4 bg-emerald-500 text-white neon-glow-teal border-none flex items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-          <Sparkles className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h4 className="text-sm font-bold">Airi AI Analysis</h4>
-          <p className="text-xs text-white/80 leading-relaxed">
-            Your heart rate is stable at {vitals.heartRate} BPM. I've analyzed your movement patterns and they indicate optimal recovery.
-          </p>
-        </div>
-      </GlassCard>
+      <motion.div variants={itemVariants}>
+        <GlassCard className="p-4 bg-emerald-500 text-white neon-glow-teal border-none flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+            <Sparkles className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold">Airi AI Real-Time Analysis</h4>
+            <p className="text-xs text-white/80 leading-relaxed">
+              Your heart rate is stable at {vitals.heartRate} BPM. I've analyzed your movement patterns and they indicate optimal recovery.
+            </p>
+          </div>
+        </GlassCard>
+      </motion.div>
 
-      {/* Main Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 relative z-10">
-        {stats.map((stat, idx) => (
-          <GlassCard key={stat.label} delay={idx * 0.05} className="p-5 flex flex-col items-center text-center group hover:scale-[1.02] transition-transform bg-white/5 border-white/10">
-            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-3 transition-colors", stat.bg)}>
-              <stat.icon className={cn("w-6 h-6", stat.color)} />
-            </div>
-            <div className="text-2xl font-bold text-white">{stat.value}</div>
-            <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{stat.label}</div>
-          </GlassCard>
+      {/* Main Stats Grid with Staggered Entrance */}
+      <motion.div 
+        variants={containerVariants}
+        className="grid grid-cols-2 md:grid-cols-3 gap-4 relative z-10"
+      >
+        {stats.map((stat) => (
+          <motion.div
+            key={stat.label}
+            variants={itemVariants}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
+            <GlassCard className="p-5 flex flex-col items-center text-center group bg-white/5 border-white/10 h-full justify-center">
+              <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110 duration-300", stat.bg)}>
+                <stat.icon className={cn("w-6 h-6", stat.color)} />
+              </div>
+              <div className="text-2xl font-black text-white tracking-tight">{stat.value}</div>
+              <div className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-0.5">{stat.label}</div>
+            </GlassCard>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
+
+      {/* Recharts Trend Analysis Section */}
+      <motion.div variants={sectionVariants}>
+        <VitalsTrendAnalysis />
+      </motion.div>
 
       {/* Sensor Status */}
-      <section className="space-y-4 relative z-10">
+      <motion.section variants={sectionVariants} className="space-y-4 relative z-10">
         <div className="flex items-center gap-2 text-white/80">
-          <Compass className="w-5 h-5" />
+          <Compass className="w-5 h-5 text-emerald-400" />
           <h3 className="text-sm font-bold uppercase tracking-widest">Active Sensors</h3>
         </div>
         <div className="grid gap-3">
-          <GlassCard className="p-4 flex items-center justify-between bg-white/5 border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                <Smartphone className="w-5 h-5 text-emerald-400" />
+          <motion.div whileHover={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
+            <GlassCard className="p-4 flex items-center justify-between bg-white/5 border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                  <Smartphone className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Internal Sensors</h4>
+                  <p className="text-[10px] text-white/40 font-medium uppercase tracking-wider">Accelerometer • Gyroscope • GPS</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-white">Internal Sensors</h4>
-                <p className="text-[10px] text-white/40 font-medium uppercase tracking-wider">Accelerometer • Gyroscope • GPS</p>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Active & Precise</span>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Active & Precise</span>
-              </div>
-            </div>
-          </GlassCard>
+            </GlassCard>
+          </motion.div>
 
-          <GlassCard className="p-4 flex items-center justify-between bg-white/5 border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <Bluetooth className="w-5 h-5 text-blue-400" />
+          <motion.div whileHover={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
+            <GlassCard className="p-4 flex items-center justify-between bg-white/5 border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <Bluetooth className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Wearable Link</h4>
+                  <p className="text-[10px] text-white/40 font-medium uppercase tracking-wider">Optical PPG • Heart Rate • SpO2</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-white">Wearable Link</h4>
-                <p className="text-[10px] text-white/40 font-medium uppercase tracking-wider">Optical PPG • Heart Rate • SpO2</p>
-              </div>
-            </div>
-            <button className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest neon-glow-teal">
-              Connect
-            </button>
-          </GlassCard>
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest neon-glow-teal cursor-pointer"
+              >
+                Connect
+              </motion.button>
+            </GlassCard>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Movement Analysis */}
-      <section className="space-y-4 relative z-10">
+      <motion.section variants={sectionVariants} className="space-y-4 relative z-10">
         <div className="flex items-center gap-2 text-white/80">
-          <Activity className="w-5 h-5" />
+          <Activity className="w-5 h-5 text-emerald-400" />
           <h3 className="text-sm font-bold uppercase tracking-widest">Movement Analysis</h3>
         </div>
         <GlassCard className="p-6 bg-white/5 border-white/10">
@@ -152,7 +221,7 @@ export const VitalsTab: React.FC = () => {
             <motion.div 
               initial={{ width: 0 }}
               animate={{ width: '84.32%' }}
-              transition={{ duration: 1, ease: "easeOut" }}
+              transition={{ duration: 1.2, ease: "easeOut", delay: 0.2 }}
               className="h-full bg-emerald-500 neon-glow-teal"
             />
           </div>
@@ -171,7 +240,7 @@ export const VitalsTab: React.FC = () => {
             </div>
           </div>
         </GlassCard>
-      </section>
-    </div>
+      </motion.section>
+    </motion.div>
   );
 };

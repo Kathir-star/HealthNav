@@ -1,14 +1,10 @@
 import React from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { GlassCard } from '../components/GlassCard';
 import { AuthSelection } from '../components/auth/AuthSelection';
-import { LoginForm } from '../components/auth/LoginForm';
-import { SignUpForm } from '../components/auth/SignUpForm';
 
 export const AuthPage: React.FC = () => {
-  const location = useLocation();
-
   return (
     <div className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden">
       {/* Nature-Themed Background */}
@@ -32,27 +28,16 @@ export const AuthPage: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-lg relative z-10"
+        className="w-full max-w-md relative z-10"
       >
-        <GlassCard className="p-10 shadow-2xl border-white/10 relative overflow-hidden">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Routes>
-                <Route index element={<AuthSelection />} />
-                <Route path="login" element={<LoginForm />} />
-                <Route path="signup" element={<SignUpForm />} />
-                <Route path="*" element={<Navigate to="/auth" replace />} />
-              </Routes>
-            </motion.div>
-          </AnimatePresence>
+        <GlassCard className="p-8 md:p-10 shadow-2xl border-white/10 relative overflow-hidden">
+          <Routes>
+            <Route index element={<AuthSelection />} />
+            <Route path="*" element={<Navigate to="/auth" replace />} />
+          </Routes>
         </GlassCard>
       </motion.div>
     </div>
   );
 };
+
