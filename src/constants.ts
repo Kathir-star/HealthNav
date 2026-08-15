@@ -307,3 +307,173 @@ export const MOCK_INSURANCE: Insurance[] = [
     link: "https://www.icicilombard.com/"
   }
 ];
+
+export const SUGGESTED_AI_PROMPTS = [
+  {
+    title: "Explain a medical term",
+    prompt: "Can you explain what 'Hypertension Stage 1' and 'Systolic vs Diastolic' mean in simple terms?",
+    category: "Terminology"
+  },
+  {
+    title: "Help me understand my report",
+    prompt: "Can you explain what a high blood pressure reading generally means?",
+    category: "Lab & Reports"
+  },
+  {
+    title: "What questions should I ask my doctor?",
+    prompt: "What are the most important questions I should ask my doctor during an annual cardiology check-up?",
+    category: "Preparation"
+  },
+  {
+    title: "Help me understand my symptoms",
+    prompt: "I've had mild headaches and eye fatigue after long screen hours. How should I think about these symptoms?",
+    category: "Symptom Context"
+  },
+  {
+    title: "Prepare for doctor's appointment",
+    prompt: "How can I best prepare my medical history, symptoms list, and medications before seeing a new specialist?",
+    category: "Care Navigation"
+  }
+];
+
+export const MOCK_TIMELINE_EVENTS = [
+  {
+    id: "tl-1",
+    title: "Comprehensive Metabolic Panel (CMP) Completed",
+    date: "August 12, 2026",
+    time: "09:30 AM",
+    type: "report" as const,
+    description: "Routine fasting blood tests covering kidney and liver function, glucose, and electrolytes.",
+    details: "Glucose fasting: 94 mg/dL (Normal). eGFR: >90 mL/min (Normal). Electrolytes within optimal reference ranges.",
+    provider: "Apollo Diagnostics Lab",
+    status: "reviewed" as const,
+    tags: ["Lab Report", "Routine", "Blood Panel"],
+    isDemo: true
+  },
+  {
+    id: "tl-2",
+    title: "Cardiology Consultation & ECG Review",
+    date: "July 28, 2026",
+    time: "11:15 AM",
+    type: "appointment" as const,
+    description: "In-person assessment with Dr. Sarah Chen to review blood pressure trends and resting heart rhythm.",
+    details: "Resting BP observed at 122/80 mmHg. Sinus rhythm confirmed. Recommended continuing daily 30-minute brisk walk and low-sodium hydration routine.",
+    provider: "Metro Specialty Clinic",
+    status: "completed" as const,
+    tags: ["Cardiology", "Consultation", "ECG"],
+    isDemo: true
+  },
+  {
+    id: "tl-3",
+    title: "Medication Adjustment: Metformin & Vitamin D3",
+    date: "June 15, 2026",
+    time: "04:00 PM",
+    type: "medication" as const,
+    description: "Updated daily regimen for metabolic health and seasonal vitamin balance.",
+    details: "Metformin 500mg once daily with evening meal. Vitamin D3 2000 IU softgel once daily morning with food.",
+    provider: "Wellness Meds Pharmacy",
+    status: "completed" as const,
+    tags: ["Medication", "Prescription", "Metabolic"],
+    isDemo: true
+  },
+  {
+    id: "tl-4",
+    title: "AI Health Navigator Analysis: Blood Pressure Guidelines",
+    date: "May 20, 2026",
+    time: "02:45 PM",
+    type: "ai_interaction" as const,
+    description: "Reviewed educational guidance on healthy systolic ranges and lifestyle measures for cardiovascular wellness.",
+    details: "HealthNav AI provided structured overview of home monitoring techniques, hydration impact, and recommended discussion points for physician review.",
+    provider: "HealthNav AI",
+    status: "reviewed" as const,
+    tags: ["AI Navigator", "Education", "Vitals"],
+    isDemo: true
+  },
+  {
+    id: "tl-5",
+    title: "Annual Preventive Health Screening",
+    date: "March 10, 2026",
+    time: "10:00 AM",
+    type: "assessment" as const,
+    description: "Full health screening including lipid panel, BMI, vision, and pulmonary function check.",
+    details: "Total Cholesterol: 185 mg/dL. HDL: 54 mg/dL. LDL: 110 mg/dL. All vital indicators recorded in healthy operational ranges.",
+    provider: "City Care Health Center",
+    status: "completed" as const,
+    tags: ["Preventive", "Annual Check", "Lipid Profile"],
+    isDemo: true
+  }
+];
+
+export const MOCK_HEALTH_RECORDS = [
+  {
+    id: "rec-1",
+    title: "Comprehensive Blood Panel & Lipid Profile",
+    category: "Lab Reports" as const,
+    date: "Aug 12, 2026",
+    fileName: "blood_panel_aug2026.pdf",
+    fileSize: "1.4 MB",
+    status: "Verified" as const,
+    provider: "Apollo Diagnostics",
+    summary: "Fasting lipid profile, HbA1c (5.4%), renal function tests, and liver enzymes within normal parameters.",
+    tags: ["Lipid Profile", "HbA1c", "Routine"],
+    notes: "Follow-up recommended in 6 months for routine monitoring.",
+    isDemo: true
+  },
+  {
+    id: "rec-2",
+    title: "Cardiology Consultation Prescription",
+    category: "Prescriptions" as const,
+    date: "Jul 28, 2026",
+    fileName: "rx_cardiology_chen_jul2026.pdf",
+    fileSize: "480 KB",
+    status: "Verified" as const,
+    provider: "Dr. Sarah Chen, MD",
+    summary: "Maintenance regimen prescription including Metformin 500mg and daily multivitamin supplement.",
+    tags: ["Prescription", "Cardiology", "Active"],
+    notes: "Take with food. Verified by pharmacist.",
+    isDemo: true
+  },
+  {
+    id: "rec-3",
+    title: "Chest X-Ray Digital Imaging & Radiologist Note",
+    category: "Imaging" as const,
+    date: "May 04, 2026",
+    fileName: "chest_xray_radiology_may2026.pdf",
+    fileSize: "4.8 MB",
+    status: "Verified" as const,
+    provider: "Metro Imaging & Diagnostics",
+    summary: "PA view chest radiograph demonstrates clear lung fields, normal cardiothoracic ratio, and no focal consolidation.",
+    tags: ["Radiology", "X-Ray", "Lungs"],
+    notes: "No acute cardiopulmonary disease detected.",
+    isDemo: true
+  },
+  {
+    id: "rec-4",
+    title: "Annual Seasonal Influenza Vaccination Record",
+    category: "Vaccination" as const,
+    date: "Nov 14, 2025",
+    fileName: "flu_vaccine_certificate_2025.pdf",
+    fileSize: "320 KB",
+    status: "Verified" as const,
+    provider: "City Public Health Clinic",
+    summary: "Quadrivalent inactivated influenza vaccine administered in left deltoid.",
+    tags: ["Vaccination", "Immunization", "Influenza"],
+    notes: "Next booster due Autumn 2026.",
+    isDemo: true
+  },
+  {
+    id: "rec-5",
+    title: "Clinical Summary & Discharge Summary Note",
+    category: "Medical Reports" as const,
+    date: "Jan 18, 2025",
+    fileName: "clinical_summary_jan2025.pdf",
+    fileSize: "890 KB",
+    status: "Processed" as const,
+    provider: "Fortis Memorial Hospital",
+    summary: "Outpatient orthopedic assessment following mild ankle sprain. Resolved with conservative physiotherapy.",
+    tags: ["Outpatient", "Orthopedic", "Summary"],
+    notes: "Fully rehabilitated. No ongoing restrictions.",
+    isDemo: true
+  }
+];
+

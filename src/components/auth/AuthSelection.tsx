@@ -1,10 +1,12 @@
 import React from 'react';
-import { ShieldCheck, Heart, Lock, Sparkles, Loader2, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { authService } from '../../services/authService';
+import { ShieldCheck, Heart, Lock, Sparkles, Loader2, ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { authService, DEFAULT_GUEST_USER } from '../../services/authService';
+import { HealthNavLogo } from '../HealthNavLogo';
 import { toast } from 'sonner';
 
 export const AuthSelection: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
@@ -22,31 +24,37 @@ export const AuthSelection: React.FC = () => {
     }
   };
 
+  const handleDemoAccess = () => {
+    toast.success("Welcome to HealthNav Demo Mode!");
+    navigate('/app');
+  };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       {/* Brand & Emblem */}
-      <div className="text-center space-y-3">
-        <div className="relative inline-block">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 mx-auto flex items-center justify-center neon-glow-teal shadow-xl shadow-emerald-500/20">
-            <Heart className="text-white w-8 h-8 fill-white/20" />
-          </div>
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-950 border-2 border-emerald-500 flex items-center justify-center">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          </div>
-        </div>
+      <div className="text-center space-y-2 flex flex-col items-center">
+        <HealthNavLogo size="lg" showText={false} />
 
         <div>
-          <h2 className="text-2xl md:text-3xl font-black text-emerald-50 tracking-tight">
-            Your Health, One Connected Place
+          <h2 className="text-2xl md:text-3xl font-black tracking-tight flex items-center justify-center gap-0.5">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-cyan-300">
+              Health
+            </span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">
+              Nav
+            </span>
           </h2>
-          <p className="text-emerald-100/60 mt-2 text-sm font-medium leading-relaxed max-w-sm mx-auto">
-            Access your AI medical companion, prescription safety checks, and care navigation.
+          <p className="text-emerald-300/90 font-semibold text-xs tracking-wider uppercase mt-1">
+            Your Health. Clearly Navigated.
+          </p>
+          <p className="text-emerald-100/70 mt-2 text-xs md:text-sm font-normal leading-relaxed max-w-sm mx-auto">
+            Understand your health records, organize your clinical timeline, and get AI-assisted healthcare navigation.
           </p>
         </div>
       </div>
 
-      {/* Primary Action Card */}
-      <div className="space-y-4 pt-2">
+      {/* Primary Action Buttons */}
+      <div className="space-y-3 pt-1">
         {errorMessage && (
           <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs font-medium text-center">
             {errorMessage}
@@ -57,7 +65,7 @@ export const AuthSelection: React.FC = () => {
           id="google-signin-btn"
           onClick={handleGoogleLogin}
           disabled={loading}
-          className="w-full h-14 rounded-2xl bg-white text-emerald-950 font-bold text-base flex items-center justify-center gap-3 shadow-lg shadow-emerald-950/40 hover:bg-emerald-50 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed group cursor-pointer"
+          className="w-full h-13 rounded-2xl bg-white text-emerald-950 font-bold text-sm flex items-center justify-center gap-3 shadow-lg shadow-emerald-950/40 hover:bg-emerald-50 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed group cursor-pointer"
         >
           {loading ? (
             <>
@@ -89,29 +97,48 @@ export const AuthSelection: React.FC = () => {
           )}
         </button>
 
-        <p className="text-[11px] text-center text-emerald-100/40 font-medium px-2">
-          By continuing, you agree to our Terms of Service and acknowledge our Healthcare Privacy Policy.
+        <div className="relative py-1">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-white/10" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-emerald-950 px-2 text-[10px] tracking-wider text-emerald-200/50">or explore preview</span>
+          </div>
+        </div>
+
+        <button 
+          id="demo-access-btn"
+          onClick={handleDemoAccess}
+          className="w-full h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-100 font-semibold text-xs flex items-center justify-center gap-2 hover:bg-emerald-500/30 hover:border-emerald-400/60 transition-all cursor-pointer"
+        >
+          <Sparkles className="w-4 h-4 text-emerald-400" />
+          <span>Launch CIT Hackfest Demo Experience</span>
+          <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />
+        </button>
+
+        <p className="text-[11px] text-center text-emerald-100/50 font-normal px-2 pt-1">
+          By signing in, you access private health records protected with encryption. No clinical claims are made without medical evaluation.
         </p>
       </div>
 
-      {/* Security & Feature Badges */}
-      <div className="pt-2 border-t border-white/5 grid grid-cols-3 gap-2 text-center">
-        <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-1">
+      {/* Trust & Safety Highlights */}
+      <div className="pt-2 border-t border-white/10 grid grid-cols-3 gap-2 text-center">
+        <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 space-y-1">
           <Lock className="w-4 h-4 text-emerald-400 mx-auto" />
-          <p className="text-[10px] font-bold text-emerald-100/70">Encrypted</p>
+          <p className="text-[10px] font-bold text-emerald-100/80">Encrypted Data</p>
         </div>
-        <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-1">
+        <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 space-y-1">
           <ShieldCheck className="w-4 h-4 text-teal-400 mx-auto" />
-          <p className="text-[10px] font-bold text-emerald-100/70">Verified OAuth</p>
+          <p className="text-[10px] font-bold text-emerald-100/80">Privacy Controls</p>
         </div>
-        <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-1">
-          <Sparkles className="w-4 h-4 text-amber-400 mx-auto" />
-          <p className="text-[10px] font-bold text-emerald-100/70">Airi AI Ready</p>
+        <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 space-y-1">
+          <Sparkles className="w-4 h-4 text-lime-400 mx-auto" />
+          <p className="text-[10px] font-bold text-emerald-100/80">AI Navigator</p>
         </div>
       </div>
 
       {/* Back Link */}
-      <div className="text-center pt-2">
+      <div className="text-center pt-1">
         <Link 
           to="/"
           className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-100/60 hover:text-emerald-300 transition-colors"
@@ -123,4 +150,5 @@ export const AuthSelection: React.FC = () => {
     </div>
   );
 };
+
 

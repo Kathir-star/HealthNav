@@ -33,11 +33,12 @@
 
 body {
   @apply bg-emerald-950 text-emerald-50 font-sans antialiased overflow-x-hidden min-h-screen;
-  background-image: linear-gradient(rgba(6, 78, 59, 0.85), rgba(2, 44, 34, 0.95)), url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=2560&auto=format&fit=crop');
-  background-size: cover;
-  background-position: center;
+  background-color: #022c22;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(6, 78, 59, 0.4) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(4, 47, 46, 0.3) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(2, 44, 34, 0.6) 0px, transparent 50%);
   background-attachment: fixed;
-  background-color: #064E3B; /* Fallback */
 }
 
 h1, h2, h3, h4, h5, h6 {

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Shield, Activity, Heart, ArrowRight, CheckCircle2, Star, Menu, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
+import { HealthNavLogo } from '../components/HealthNavLogo';
 
 export const LandingPage: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -12,12 +13,7 @@ export const LandingPage: React.FC = () => {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-[100] px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between glass border border-white/10 rounded-2xl px-6 py-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center neon-glow-teal">
-              <Heart className="text-white w-6 h-6" />
-            </div>
-            <span className="text-xl font-black tracking-tight">HealthNav</span>
-          </div>
+          <HealthNavLogo size="md" subtitleText="Your Health. Clearly Navigated." />
 
           <div className="hidden md:flex items-center gap-8">
             {['Features', 'How it Works', 'Pricing', 'About'].map((item) => (
@@ -297,15 +293,10 @@ export const LandingPage: React.FC = () => {
       {/* Footer */}
       <footer className="py-20 px-6 border-t border-white/5">
         <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-12">
-          <div className="space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center neon-glow-teal">
-                <Heart className="text-white w-6 h-6" />
-              </div>
-              <span className="text-xl font-black tracking-tight">HealthNav</span>
-            </div>
-            <p className="text-sm text-emerald-100/40 font-medium leading-relaxed">
-              Navigating the future of personal healthcare with advanced AI and real-time insights.
+          <div className="space-y-4">
+            <HealthNavLogo size="md" subtitleText="Your Health. Clearly Navigated." />
+            <p className="text-xs text-emerald-100/60 font-medium leading-relaxed pt-2">
+              Navigating the future of personal healthcare with advanced AI, verified interactions, and real-time medical insights.
             </p>
           </div>
 

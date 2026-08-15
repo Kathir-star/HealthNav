@@ -61,8 +61,8 @@ export const InsuranceTab: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState('');
 
   const filteredInsurance = REAL_INSURANCE.filter(plan => 
-    plan.provider.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    plan.planName.toLowerCase().includes(searchQuery.toLowerCase())
+    (plan.provider || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+    (plan.planName || '').toLowerCase().includes((searchQuery || '').toLowerCase())
   );
 
   return (

@@ -1,5 +1,9 @@
-import React from 'react';
-import { Search, Pill, ArrowUpRight, ArrowDownRight, Minus, CheckCircle2, Camera, X, Info, ShoppingCart, Clock, ExternalLink, Loader2, Sparkles, BookOpen, ShieldCheck, AlertTriangle, XCircle, Plus } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Search, Pill, ArrowUpRight, ArrowDownRight, Minus, CheckCircle2, 
+  Camera, X, Info, ShoppingCart, Clock, ExternalLink, Loader2, Sparkles, 
+  BookOpen, ShieldCheck, AlertTriangle, XCircle, Plus, Edit3, Trash2 
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { databaseService } from '../services/databaseService';
@@ -9,6 +13,8 @@ import { ArticleSection } from './ArticleSection';
 import { getRecommendedArticles, getAiriResponse } from '../services/geminiService';
 import { Article } from '../types';
 import { useProfile } from '../hooks/useProfile';
+import { DeleteConfirmModal } from './modals/DeleteConfirmModal';
+import { UnsavedChangesModal } from './modals/UnsavedChangesModal';
 
 interface MedicineResult {
   id: string;
@@ -36,12 +42,99 @@ interface MedicineResult {
 
 export const MedicineTab: React.FC = () => {
   const { profile } = useProfile();
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [isSearching, setIsSearching] = React.useState(false);
-  const [results, setResults] = React.useState<MedicineResult[]>([]);
-  const [recommendedArticles, setRecommendedArticles] = React.useState<Article[]>([]);
-  const [isArticlesLoading, setIsArticlesLoading] = React.useState(false);
-  const [analyzingMedId, setAnalyzingMedId] = React.useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [results, setResults] = useState<MedicineResult[]>([]);
+  const [recommendedArticles, setRecommendedArticles] = useState<Article[]>([]);
+  const [isArticlesLoading, setIsArticlesLoading] = useState(false);
+  const [analyzingMedId, setAnalyzingMedId] = useState<string | null>(null);
+
+  // Medication Tracker State
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [editingMed, setEditingMed] = useState<any | null>(null);
+  const [deletingMed, setDeletingMed] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showUnsavedPrompt, setShowUnsavedPrompt] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    dosage: '',
+    time: '',
+    sound: 'Zen',
+    notes: ''
+  });
+
+  const audioPlayer = useRef<HTMLAudioElement | null>(null);
+
+  const alarmSounds: Record<string, string> = {
+    Zen: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
+    Chime: 'https://assets.mixkit.co/active_storage/sfx/2874/2874-preview.mp3',
+    Nature: 'https://assets.mixkit.co/active_storage/sfx/2432/2432-preview.mp3'
+  };
+
+  const fetchReminders = async () => {
+    try {
+      const data = await databaseService.getReminders(profile?.uid);
+      setReminders(data || []);
+    } catch (err) {
+      console.error("Error fetching reminders:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchReminders();
+  }, [profile?.uid]);
+
+  // Audio reminder listener
+  useEffect(() => {
+    audioPlayer.current = new Audio();
+    const interval = setInterval(() => {
+      const now = new Date();
+      reminders.forEach(med => {
+        if (med.reminder_time && !med.taken) {
+          const reminderTime = new Date(med.reminder_time);
+          if (Math.abs(now.getTime() - reminderTime.getTime()) < 60000 && !med.triggered) {
+            playAlarm(med);
+          }
+        }
+      });
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [reminders]);
+
+  const playAlarm = (med: any) => {
+    if (audioPlayer.current) {
+      audioPlayer.current.src = alarmSounds[med.sound || 'Zen'];
+      audioPlayer.current.play().catch(e => console.error("Audio play error:", e));
+    }
+    
+    toast.custom((t) => (
+      <div className="bg-emerald-950 border border-emerald-500 p-6 rounded-2xl shadow-2xl neon-glow-teal flex flex-col items-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center animate-bounce">
+          <Clock className="w-8 h-8 text-emerald-400" />
+        </div>
+        <div className="text-center">
+          <h3 className="text-xl font-bold text-emerald-50">🔔 REMINDER: {med.medicine_name}</h3>
+          <p className="text-emerald-100/60">It is time to take your medication ({med.dosage}).</p>
+        </div>
+        <button 
+          onClick={() => {
+            audioPlayer.current?.pause();
+            toggleTaken(med.id, false);
+            toast.dismiss(t);
+          }}
+          className="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold hover:scale-105 transition-transform"
+        >
+          I've Taken It
+        </button>
+      </div>
+    ), { duration: Infinity });
+
+    setReminders(prev => prev.map(r => r.id === med.id ? { ...r, triggered: true } : r));
+  };
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -55,7 +148,6 @@ export const MedicineTab: React.FC = () => {
       setIsArticlesLoading(false);
     });
 
-    // Simulate AI search across many websites in Asia
     setTimeout(() => {
       const mockResults: MedicineResult[] = [
         {
@@ -98,8 +190,8 @@ export const MedicineTab: React.FC = () => {
           genericName: 'Generic ' + searchQuery,
           price: 390,
           shopName: '1mg',
-          arrivalTime: '4 Hours',
-          imageUrl: `https://images.unsplash.com/photo-1587854692152-cbe660dbbb88?q=80&w=400&auto=format&fit=crop`,
+          arrivalTime: '2-3 Days',
+          imageUrl: `https://images.unsplash.com/photo-1550572017-edd951aa8f72?q=80&w=400&auto=format&fit=crop`,
           link: `https://www.1mg.com/search/all?name=${encodeURIComponent(searchQuery)}`,
           verified: true,
           trend: 'up',
@@ -112,478 +204,515 @@ export const MedicineTab: React.FC = () => {
       ];
       setResults(mockResults);
       setIsSearching(false);
-    }, 2000);
+    }, 1000);
   };
 
-  const checkSafety = async (med: MedicineResult) => {
+  const handleSafetyCheck = async (med: MedicineResult) => {
     setAnalyzingMedId(med.id);
     try {
-      const prompt = `Analyze the safety of ${med.name} (${med.genericName}) for me. Provide a detailed safety analysis based on my profile.`;
+      const prompt = `Perform a safety check for a patient considering: ${med.name} (${med.genericName}).
+Patient Health Profile:
+- Age: ${profile?.profile?.age || 28}
+- Biological Sex: ${profile?.profile?.gender || 'male'}
+- Existing Conditions: ${profile?.health?.conditions?.join(', ') || 'None reported'}
+- Known Allergies: ${profile?.health?.allergies?.join(', ') || 'None reported'}
+- Pregnancy Status: ${profile?.pregnancy?.status || 'not_pregnant'}
+
+Return a structured evaluation with status (SAFE, CAUTION, or CONTRAINDICATED), clinical analysis, recommendation, and any specific warning.`;
+
       const response = await getAiriResponse(prompt, profile);
       
-      // Parse the response into structured format
-      // Airi's response format is:
-      // **Analysis:** ...
-      // **Safety Status:** ✅ / ⚠️ / ❌
-      // **Recommendation:** ...
-      // **Warning:** ...
+      const responseStr = typeof response === 'string' ? response : (response?.text || '');
+      let status: '✅' | '⚠️' | '❌' = '✅';
+      const lowerResp = responseStr.toLowerCase();
+      if (lowerResp.includes('contraindicated') || lowerResp.includes('danger') || lowerResp.includes('severe risk')) {
+        status = '❌';
+      } else if (lowerResp.includes('caution') || lowerResp.includes('monitor') || lowerResp.includes('moderate')) {
+        status = '⚠️';
+      }
 
-      const statusMatch = response.match(/\*\*Safety Status:\*\*\s*([✅⚠️❌])/);
-      const analysisMatch = response.match(/\*\*Analysis:\*\*\s*([\s\S]*?)(?=\*\*|$)/);
-      const recommendationMatch = response.match(/\*\*Recommendation:\*\*\s*([\s\S]*?)(?=\*\*|$)/);
-      const warningMatch = response.match(/\*\*Warning:\*\*\s*([\s\S]*?)(?=\*\*|$)/);
+      setResults(prev => prev.map(m => m.id === med.id ? {
+        ...m,
+        safetyAnalysis: {
+          status,
+          analysis: responseStr,
+          recommendation: status === '✅' ? 'Compatible with your recorded health profile.' : 'Consult your prescribing doctor before taking.',
+          warning: status === '❌' ? 'Potential contraindication with your health profile detected.' : undefined
+        }
+      } : m));
 
-      const safetyAnalysis = {
-        status: (statusMatch ? statusMatch[1] : '⚠️') as '✅' | '⚠️' | '❌',
-        analysis: analysisMatch ? analysisMatch[1].trim() : "Unable to parse analysis.",
-        recommendation: recommendationMatch ? recommendationMatch[1].trim() : "Consult a doctor.",
-        warning: warningMatch ? warningMatch[1].trim() : undefined
-      };
-
-      setResults(prev => prev.map(m => m.id === med.id ? { ...m, safetyAnalysis } : m));
-    } catch (err) {
-      console.error("Safety check error:", err);
+      toast.success(`Safety analysis complete for ${med.name}`);
+    } catch (e) {
+      console.error(e);
+      toast.error('Safety check failed. Please retry.');
     } finally {
       setAnalyzingMedId(null);
     }
   };
 
-  const [reminders, setReminders] = React.useState<any[]>([]);
-  const [isAddingMed, setIsAddingMed] = React.useState(false);
-  const [newMed, setNewMed] = React.useState({ name: '', dosage: '', time: '', sound: 'Zen' });
-  const audioPlayer = React.useRef<HTMLAudioElement | null>(null);
-
-  const alarmSounds: Record<string, string> = {
-    'Zen': 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
-    'Chime': 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
-    'Nature': 'https://assets.mixkit.co/active_storage/sfx/2530/2530-preview.mp3'
+  // Open Create Modal
+  const openCreateModal = () => {
+    setEditingMed(null);
+    setFormData({
+      name: '',
+      dosage: '',
+      time: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+      sound: 'Zen',
+      notes: ''
+    });
+    setIsFormModalOpen(true);
   };
 
-  React.useEffect(() => {
-    audioPlayer.current = new Audio();
-    
-    const interval = setInterval(() => {
-      const now = new Date();
-      reminders.forEach(med => {
-        if (!med.taken && med.reminder_time) {
-          const reminderTime = new Date(med.reminder_time);
-          // Check if it's time (within 1 minute)
-          if (Math.abs(now.getTime() - reminderTime.getTime()) < 60000 && !med.triggered) {
-            playAlarm(med);
-          }
-        }
-      });
-    }, 1000);
+  // Open Edit Modal
+  const openEditModal = (med: any) => {
+    setEditingMed(med);
+    setFormData({
+      name: med.medicine_name || '',
+      dosage: med.dosage || '',
+      time: med.reminder_time ? (med.reminder_time.includes('T') ? med.reminder_time.slice(0, 16) : new Date().toISOString().slice(0, 16)) : '',
+      sound: med.sound || 'Zen',
+      notes: med.notes || ''
+    });
+    setIsFormModalOpen(true);
+  };
 
-    return () => clearInterval(interval);
-  }, [reminders]);
-
-  const playAlarm = (med: any) => {
-    if (audioPlayer.current) {
-      audioPlayer.current.src = alarmSounds[med.sound || 'Zen'];
-      audioPlayer.current.play().catch(e => console.error("Audio play error:", e));
+  const isFormDirty = () => {
+    if (editingMed) {
+      return (
+        formData.name !== (editingMed.medicine_name || '') ||
+        formData.dosage !== (editingMed.dosage || '') ||
+        formData.notes !== (editingMed.notes || '') ||
+        formData.sound !== (editingMed.sound || 'Zen')
+      );
     }
-    
-    toast.custom((t) => (
-      <div className="bg-emerald-950 border border-emerald-500 p-6 rounded-2xl shadow-2xl neon-glow-teal flex flex-col items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center animate-bounce">
-          <Clock className="w-8 h-8 text-emerald-400" />
-        </div>
-        <div className="text-center">
-          <h3 className="text-xl font-bold text-emerald-50">🔔 REMINDER: {med.medicine_name}</h3>
-          <p className="text-emerald-100/60">It is time to take your medication ({med.dosage}).</p>
-        </div>
-        <button 
-          onClick={() => {
-            audioPlayer.current?.pause();
-            toggleTaken(med.id, false);
-            toast.dismiss(t);
-          }}
-          className="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold hover:scale-105 transition-transform"
-        >
-          I've Taken It
-        </button>
-      </div>
-    ), { duration: Infinity });
-
-    // Mark as triggered locally to avoid multiple alerts
-    setReminders(prev => prev.map(r => r.id === med.id ? { ...r, triggered: true } : r));
+    return Boolean(formData.name || formData.dosage || formData.notes);
   };
 
-  React.useEffect(() => {
-    fetchReminders();
-  }, [profile]);
-
-  const fetchReminders = async () => {
-    try {
-      const data = await databaseService.getReminders(profile?.uid);
-      setReminders(data || []);
-    } catch (err) {
-      console.error("Error fetching reminders:", err);
+  const handleCloseModalWithPrompt = () => {
+    if (isFormDirty()) {
+      setShowUnsavedPrompt(true);
+    } else {
+      setIsFormModalOpen(false);
+      setEditingMed(null);
     }
   };
 
-  const handleAddMed = async (e: React.FormEvent) => {
+  // Save (Create or Update)
+  const handleSaveMed = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMed.name || !newMed.dosage || !newMed.time) return;
+    if (!formData.name.trim()) {
+      toast.error("Medicine name is required");
+      return;
+    }
+    if (!formData.dosage.trim()) {
+      toast.error("Dosage is required (e.g. 500mg, 1 tablet)");
+      return;
+    }
 
+    setIsSaving(true);
     try {
-      await databaseService.addReminder(profile?.uid, {
-        name: newMed.name,
-        dosage: newMed.dosage,
-        time: newMed.time,
-        sound: newMed.sound
-      });
+      if (editingMed) {
+        // UPDATE
+        await databaseService.updateReminder(editingMed.id, {
+          medicine_name: formData.name.trim(),
+          dosage: formData.dosage.trim(),
+          reminder_time: formData.time,
+          sound: formData.sound,
+          notes: formData.notes.trim()
+        }, profile?.uid);
 
-      toast.success("Medicine added to your tracker!");
-      setIsAddingMed(false);
-      setNewMed({ name: '', dosage: '', time: '', sound: 'Zen' });
-      fetchReminders();
-    } catch (err) {
-      console.error("Error adding medicine:", err);
-      toast.error("Failed to add medicine.");
+        toast.success(`Updated reminder for "${formData.name}"`);
+      } else {
+        // CREATE
+        await databaseService.addReminder(profile?.uid, {
+          name: formData.name.trim(),
+          dosage: formData.dosage.trim(),
+          time: formData.time,
+          sound: formData.sound,
+          notes: formData.notes.trim()
+        });
+
+        toast.success(`Added "${formData.name}" to medication tracker`);
+      }
+
+      setIsFormModalOpen(false);
+      setEditingMed(null);
+      await fetchReminders();
+    } catch (err: any) {
+      console.error("Error saving medicine:", err);
+      toast.error(err.message || "Failed to save medication reminder.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleDeleteMed = async (id: string) => {
+  // Real Delete Operation
+  const handleConfirmDelete = async () => {
+    if (!deletingMed) return;
+    setIsDeleting(true);
     try {
-      await databaseService.deleteReminder(id);
-      setReminders(prev => prev.filter(r => r.id !== id));
-      toast.success("Medicine removed.");
-    } catch (err) {
+      await databaseService.deleteReminder(deletingMed.id, profile?.uid);
+      setReminders(prev => prev.filter(r => r.id !== deletingMed.id));
+      toast.success(`Medication "${deletingMed.medicine_name}" removed from tracker`);
+      setDeletingMed(null);
+    } catch (err: any) {
       console.error("Error deleting medicine:", err);
+      toast.error(err.message || "Failed to delete medicine.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const toggleTaken = async (id: string, currentStatus: boolean) => {
     try {
-      await databaseService.toggleReminder(id, currentStatus);
+      await databaseService.toggleReminder(id, currentStatus, profile?.uid);
       setReminders(prev => prev.map(r => r.id === id ? { ...r, taken: !currentStatus } : r));
+      toast.success(!currentStatus ? "Marked as taken!" : "Marked as pending");
     } catch (err) {
       console.error("Error updating status:", err);
     }
   };
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-6 pb-24 max-w-5xl mx-auto">
       {/* Medicine Tracker Section */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-emerald-900/60 via-emerald-950/70 to-teal-950/50 border border-emerald-500/20 rounded-3xl p-6 relative overflow-hidden backdrop-blur-xl">
         <div>
-          <h2 className="text-2xl font-bold text-emerald-50">My Medicine Tracker</h2>
-          <p className="text-sm text-emerald-100/60 font-medium">Manage your daily medications and reminders</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-semibold mb-2">
+            <Pill className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Active Regimen & Reminders</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+            My Medicine Tracker
+          </h2>
+          <p className="text-xs sm:text-sm text-emerald-100/70 max-w-xl">
+            Real persistent database storage for your active prescriptions, dosage schedules, sound alerts, and compliance history.
+          </p>
         </div>
+
         <button 
-          onClick={() => setIsAddingMed(true)}
-          className="p-3 rounded-xl bg-emerald-500 text-white shadow-lg neon-glow-teal hover:scale-105 transition-transform"
+          onClick={openCreateModal}
+          className="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer self-start sm:self-center shrink-0"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-4 h-4" />
+          <span>Add Medication</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
+      {/* Reminders List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {reminders.length === 0 ? (
-          <GlassCard className="col-span-full py-12 text-center border-dashed border-emerald-500/20">
-            <Clock className="w-12 h-12 text-emerald-500/20 mx-auto mb-3" />
-            <p className="text-emerald-100/40 text-sm">No medicines added yet. Click the + button to start tracking.</p>
+          <GlassCard className="col-span-full py-12 text-center border-dashed border-emerald-500/20 space-y-3">
+            <Clock className="w-12 h-12 text-emerald-500/20 mx-auto" />
+            <p className="text-emerald-100/60 text-xs">No medications added yet. Click "Add Medication" to start tracking.</p>
+            <button
+              onClick={openCreateModal}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Medication</span>
+            </button>
           </GlassCard>
         ) : (
           reminders.map((med, idx) => (
-            <GlassCard key={med.id} delay={idx * 0.05} className="flex items-center justify-between p-4 border-emerald-500/10">
-              <div className="flex items-center gap-4">
+            <GlassCard key={med.id} delay={idx * 0.04} className="p-4 border-emerald-500/15 hover:border-emerald-400/30 transition-all flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3.5 min-w-0">
                 <button 
                   onClick={() => toggleTaken(med.id, med.taken)}
                   className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all",
-                    med.taken ? "bg-emerald-500 border-emerald-500 text-white" : "border-emerald-500/20 text-emerald-500/40 hover:border-emerald-500"
+                    "w-10 h-10 rounded-2xl flex items-center justify-center border-2 transition-all shrink-0 cursor-pointer",
+                    med.taken 
+                      ? "bg-emerald-500 border-emerald-400 text-white shadow-md shadow-emerald-500/20" 
+                      : "border-emerald-500/30 text-emerald-500/40 hover:border-emerald-400 hover:text-emerald-400"
                   )}
+                  title={med.taken ? "Mark as pending" : "Mark as taken"}
                 >
-                  <CheckCircle2 className="w-6 h-6" />
+                  <CheckCircle2 className="w-5 h-5" />
                 </button>
-                <div>
-                  <h4 className="font-bold text-emerald-50">{med.medicine_name}</h4>
-                  <p className="text-xs text-emerald-100/60">
-                    {med.dosage} • {med.reminder_time ? new Date(med.reminder_time).toLocaleString() : 'As Needed'}
+                <div className="min-w-0">
+                  <h4 className={cn("font-bold text-sm text-white truncate", med.taken && "line-through opacity-60")}>
+                    {med.medicine_name}
+                  </h4>
+                  <p className="text-xs text-emerald-200/70 truncate">
+                    {med.dosage} • {med.reminder_time ? (med.reminder_time.includes('T') ? new Date(med.reminder_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : med.reminder_time) : 'As Needed'}
                   </p>
+                  {med.notes && (
+                    <p className="text-[10px] text-emerald-300/50 italic truncate mt-0.5">
+                      {med.notes}
+                    </p>
+                  )}
                 </div>
               </div>
-              <button 
-                onClick={() => handleDeleteMed(med.id)}
-                className="p-2 text-emerald-100/20 hover:text-red-400 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <button 
+                  onClick={() => openEditModal(med)}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-emerald-500/20 text-emerald-200/70 hover:text-emerald-300 transition-colors cursor-pointer"
+                  title="Edit Medication"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={() => setDeletingMed(med)}
+                  className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400/80 hover:text-red-300 transition-colors cursor-pointer"
+                  title="Delete Medication"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </GlassCard>
           ))
         )}
       </div>
 
+      {/* Add / Edit Medication Modal */}
       <AnimatePresence>
-        {isAddingMed && (
+        {isFormModalOpen && (
           <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-emerald-950/80 backdrop-blur-sm">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
               className="w-full max-w-md"
             >
-              <GlassCard className="p-6 border-emerald-500/30">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-emerald-50">Add Medication</h3>
-                  <button onClick={() => setIsAddingMed(false)} className="text-emerald-100/40 hover:text-white">
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-                <form onSubmit={handleAddMed} className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5">Medicine Name</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={newMed.name}
-                      onChange={e => setNewMed({...newMed, name: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl glass border-emerald-500/20 text-emerald-50 outline-none focus:border-emerald-500"
-                      placeholder="e.g. Paracetamol"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5">Dosage</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={newMed.dosage}
-                      onChange={e => setNewMed({...newMed, dosage: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl glass border-emerald-500/20 text-emerald-50 outline-none focus:border-emerald-500"
-                      placeholder="e.g. 500mg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5">Reminder Time</label>
-                    <input 
-                      type="datetime-local" 
-                      required
-                      value={newMed.time}
-                      onChange={e => setNewMed({...newMed, time: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl glass border-emerald-500/20 text-emerald-50 outline-none focus:border-emerald-500 [color-scheme:dark]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1.5">Alarm Sound</label>
-                    <select 
-                      value={newMed.sound}
-                      onChange={e => setNewMed({...newMed, sound: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl glass border-emerald-500/20 text-emerald-50 outline-none focus:border-emerald-500 bg-emerald-900"
-                    >
-                      <option value="Zen">Zen Garden (Peaceful)</option>
-                      <option value="Chime">Soft Chime</option>
-                      <option value="Nature">Morning Birds</option>
-                    </select>
+              <GlassCard className="p-6 sm:p-7 border-emerald-500/30 space-y-5 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                      {editingMed ? <Edit3 className="w-5 h-5 text-emerald-400" /> : <Plus className="w-5 h-5 text-emerald-400" />}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">
+                        {editingMed ? 'Edit Medication' : 'Add Medication Reminder'}
+                      </h3>
+                      <p className="text-[10px] text-emerald-300/60 font-medium">
+                        {editingMed ? 'Update dosage or timing schedule' : 'Save persistent medication schedule'}
+                      </p>
+                    </div>
                   </div>
                   <button 
-                    type="submit"
-                    className="w-full py-4 rounded-xl bg-emerald-500 text-white font-bold neon-glow-teal shadow-lg mt-4"
+                    onClick={handleCloseModalWithPrompt} 
+                    className="p-1.5 rounded-xl hover:bg-white/10 text-emerald-200/60 hover:text-white cursor-pointer"
                   >
-                    Save Reminder
+                    <X className="w-5 h-5" />
                   </button>
+                </div>
+
+                <form onSubmit={handleSaveMed} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-emerald-200">Medicine Name *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.name}
+                      onChange={e => setFormData({...formData, name: e.target.value})}
+                      className="w-full bg-emerald-900/40 border border-emerald-500/30 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-emerald-300/40 focus:outline-none focus:border-emerald-400"
+                      placeholder="e.g. Metformin, Paracetamol, Atorvastatin"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-emerald-200">Dosage & Strength *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.dosage}
+                      onChange={e => setFormData({...formData, dosage: e.target.value})}
+                      className="w-full bg-emerald-900/40 border border-emerald-500/30 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-emerald-300/40 focus:outline-none focus:border-emerald-400"
+                      placeholder="e.g. 500mg (1 tablet after dinner)"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-emerald-200">Reminder Time</label>
+                      <input 
+                        type="datetime-local" 
+                        value={formData.time}
+                        onChange={e => setFormData({...formData, time: e.target.value})}
+                        className="w-full bg-emerald-900/40 border border-emerald-500/30 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-400 [color-scheme:dark]"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-emerald-200">Alarm Tone</label>
+                      <select 
+                        value={formData.sound}
+                        onChange={e => setFormData({...formData, sound: e.target.value})}
+                        className="w-full bg-emerald-900/40 border border-emerald-500/30 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                      >
+                        <option value="Zen">Zen Garden</option>
+                        <option value="Chime">Soft Chime</option>
+                        <option value="Nature">Morning Birds</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-emerald-200">Physician Instructions / Notes</label>
+                    <input 
+                      type="text"
+                      value={formData.notes}
+                      onChange={e => setFormData({...formData, notes: e.target.value})}
+                      className="w-full bg-emerald-900/40 border border-emerald-500/30 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-emerald-300/40 focus:outline-none focus:border-emerald-400"
+                      placeholder="e.g. Take with a glass of water, avoid citrus"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={handleCloseModalWithPrompt}
+                      className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 text-xs font-semibold text-emerald-200 hover:text-white cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={isSaving}
+                      className="flex-1 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <span>{editingMed ? 'Save Changes' : 'Save Reminder'}</span>
+                      )}
+                    </button>
+                  </div>
                 </form>
               </GlassCard>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-      <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-bold text-emerald-50">Global Medicine Search</h2>
-        <p className="text-sm text-emerald-100/60 font-medium">AI-powered search across Asia for the best prices and availability</p>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deletingMed)}
+        onClose={() => setDeletingMed(null)}
+        onConfirm={handleConfirmDelete}
+        itemName={deletingMed?.medicine_name}
+        title="Remove medication reminder?"
+        description="This will remove this prescription and its reminder alarms from your daily medication schedule."
+        isDeleting={isDeleting}
+      />
+
+      {/* Unsaved Changes Confirmation Modal */}
+      <UnsavedChangesModal
+        isOpen={showUnsavedPrompt}
+        onStay={() => setShowUnsavedPrompt(false)}
+        onDiscard={() => {
+          setShowUnsavedPrompt(false);
+          setIsFormModalOpen(false);
+          setEditingMed(null);
+        }}
+      />
+
+      {/* Global Medicine Search & Pharmacy Section */}
+      <div className="pt-6 border-t border-emerald-500/20 space-y-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-xl sm:text-2xl font-bold text-white">Global Medicine Search</h2>
+          <p className="text-xs text-emerald-100/60 font-medium">Search verified Asian pharmacies for real-time prices, availability, and AI profile safety</p>
+        </div>
+
+        <form onSubmit={handleSearch} className="relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 w-5 h-5 group-focus-within:scale-110 transition-transform" />
+          <input 
+            type="text" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search medicine brand or generic active ingredient (e.g. Metformin, Paracetamol, Amoxicillin)..." 
+            className="w-full h-14 pl-12 pr-28 sm:pr-32 rounded-2xl bg-emerald-950/60 border border-emerald-500/30 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 outline-none text-xs sm:text-sm text-white placeholder:text-emerald-300/40 font-medium"
+          />
+          <div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-2">
+            <button 
+              type="submit"
+              disabled={isSearching}
+              className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition-all disabled:opacity-50 cursor-pointer"
+            >
+              {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+            </button>
+          </div>
+        </form>
       </div>
 
-      <form onSubmit={handleSearch} className="relative group">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 w-5 h-5 group-focus-within:scale-110 transition-transform" />
-        <input 
-          type="text" 
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Medicine name..." 
-          className="w-full h-14 pl-12 pr-24 sm:pr-32 rounded-2xl glass border-emerald-500/20 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none font-medium text-emerald-50 placeholder:text-emerald-100/40"
-        />
-        <div className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-2">
-          <button 
-            type="submit"
-            disabled={isSearching}
-            className="px-3 sm:px-4 py-2 rounded-xl bg-emerald-500 text-white text-[10px] sm:text-xs font-bold neon-glow-teal hover:scale-105 transition-all disabled:opacity-50"
-          >
-            {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
-          </button>
-          <button type="button" className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all">
-            <Camera className="w-4 h-4 sm:w-5 h-5" />
-          </button>
-        </div>
-      </form>
-
-      <div className="grid grid-cols-1 gap-4">
-        {results.length === 0 && !isSearching && (
-          <div className="text-center py-20">
-            <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
-              <Pill className="w-10 h-10 text-emerald-400" />
-            </div>
-            <h3 className="text-xl font-bold text-emerald-50">Find Your Medicine</h3>
-            <p className="text-emerald-100/60 max-w-xs mx-auto mt-2">Search to compare prices and delivery times across top pharmacies in Asia.</p>
-          </div>
-        )}
-
-        {results.map((med, idx) => (
-          <GlassCard key={med.id} delay={idx * 0.1} className="border border-white/10 shadow-2xl overflow-hidden">
-            <div className="flex flex-col sm:flex-row gap-6">
-              <div className="w-full sm:w-32 h-48 sm:h-32 rounded-2xl overflow-hidden shrink-0 border border-emerald-500/10 shadow-lg shadow-emerald-500/5">
-                <img 
-                  src={med.imageUrl} 
-                  alt={med.name} 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className="text-xl font-bold text-emerald-50">{med.name}</h3>
-                      {med.verified && (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      )}
-                    </div>
-                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">
-                      {med.genericName}
-                    </p>
-                    <p className="text-xs text-emerald-100/60 font-medium">
-                      {med.form} • {med.pack} • <span className="text-emerald-50 font-bold">{med.shopName}</span>
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-emerald-400">₹{med.price}</div>
-                    <div className="flex items-center justify-end gap-1 text-[10px] font-bold uppercase tracking-wider">
-                      {med.trend === 'up' ? (
-                        <span className="text-red-400 flex items-center"><ArrowUpRight className="w-3 h-3" /> Rising</span>
-                      ) : med.trend === 'down' ? (
-                        <span className="text-emerald-400 flex items-center"><ArrowDownRight className="w-3 h-3" /> Dropping</span>
-                      ) : (
-                        <span className="text-emerald-100/40 flex items-center"><Minus className="w-3 h-3" /> Stable</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="w-3 h-3 text-emerald-400" />
-                      <span className="text-[10px] font-bold text-emerald-100/40 uppercase tracking-widest">Arrival Time</span>
-                    </div>
-                    <p className="text-xs text-emerald-50 font-bold">{med.arrivalTime}</p>
-                  </div>
-                  <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Info className="w-3 h-3 text-emerald-400" />
-                      <span className="text-[10px] font-bold text-emerald-100/40 uppercase tracking-widest">AI Dosage Insight</span>
-                    </div>
-                    <p className="text-xs text-emerald-50 font-bold">{med.dosage}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex flex-wrap gap-2">
-                    {med.restrictions.map(res => (
-                      <span key={res} className="px-2 py-1 rounded-lg bg-red-500/10 text-red-400 text-[10px] font-bold border border-red-500/20">
-                        {res}
+      {/* Medicine Search Results */}
+      {results.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-base font-bold text-white">Available Verified Pharmacies ({results.length})</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {results.map((res) => (
+              <GlassCard key={res.id} className="p-5 border-emerald-500/20 space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 text-[10px] font-bold uppercase tracking-wider">
+                        {res.shopName}
                       </span>
-                    ))}
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {med.substitutes.map(sub => (
-                      <span key={sub} className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
-                        {sub}
-                      </span>
-                    ))}
-                  </div>
-                  
-                  <div className="flex items-center justify-between pt-4 border-t border-emerald-100/10 gap-3">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] text-emerald-100/40 font-bold uppercase tracking-widest">
-                        Best Price Found via AI
-                      </span>
-                      <button 
-                        onClick={() => checkSafety(med)}
-                        disabled={analyzingMedId === med.id}
-                        className="flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
-                      >
-                        {analyzingMedId === med.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <ShieldCheck className="w-3 h-3" />
-                        )}
-                        Check Safety with Airi
-                      </button>
+                      <h4 className="text-base font-bold text-white mt-1 capitalize">{res.name}</h4>
+                      <p className="text-xs text-emerald-300/60">{res.genericName}</p>
                     </div>
-                    <a 
-                      href={med.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-6 py-2.5 rounded-xl bg-emerald-500 text-white text-xs font-bold neon-glow-teal hover:scale-105 transition-transform shadow-lg shadow-emerald-500/20 flex items-center gap-2 shrink-0"
-                    >
-                      Reserve & Buy <ExternalLink className="w-4 h-4" />
-                    </a>
+                    <span className="text-lg font-extrabold text-emerald-400">₹{res.price}</span>
                   </div>
 
-                  {med.safetyAnalysis && (
-                    <motion.div 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="mt-4 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {med.safetyAnalysis.status === '✅' ? (
-                            <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                          ) : med.safetyAnalysis.status === '⚠️' ? (
-                            <AlertTriangle className="w-5 h-5 text-amber-400" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-red-400" />
-                          )}
-                          <span className="text-sm font-bold text-emerald-50">Airi Safety Analysis</span>
-                        </div>
-                        <span className="text-xl">{med.safetyAnalysis.status}</span>
+                  <div className="text-xs text-emerald-100/70 space-y-1">
+                    <p>📦 <strong>Pack:</strong> {res.pack} ({res.form})</p>
+                    <p>⚡ <strong>Delivery:</strong> {res.arrivalTime}</p>
+                  </div>
+
+                  {res.safetyAnalysis && (
+                    <div className={cn(
+                      "p-3 rounded-xl border text-xs leading-relaxed space-y-1",
+                      res.safetyAnalysis.status === '✅' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-100" :
+                      res.safetyAnalysis.status === '⚠️' ? "bg-amber-500/10 border-amber-500/30 text-amber-100" :
+                      "bg-red-500/10 border-red-500/30 text-red-100"
+                    )}>
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span>{res.safetyAnalysis.status}</span>
+                        <span>Safety Compatibility Evaluation</span>
                       </div>
-                      
-                      <div className="space-y-2">
-                        <p className="text-xs text-emerald-100/80 leading-relaxed">
-                          {med.safetyAnalysis.analysis}
-                        </p>
-                        <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                          <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Recommendation</p>
-                          <p className="text-xs text-emerald-50 font-medium">{med.safetyAnalysis.recommendation}</p>
-                        </div>
-                        {med.safetyAnalysis.warning && (
-                          <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                            <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1">Warning</p>
-                            <p className="text-xs text-red-50 font-medium">{med.safetyAnalysis.warning}</p>
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
+                      <p className="text-[11px] opacity-90">{res.safetyAnalysis.recommendation}</p>
+                    </div>
                   )}
                 </div>
-              </div>
-            </div>
-          </GlassCard>
-        ))}
-      </div>
 
-      {(recommendedArticles.length > 0 || isArticlesLoading) && (
-        <div className="mt-12 pt-12 border-t border-emerald-100/10">
-          <ArticleSection 
-            articles={recommendedArticles} 
-            isLoading={isArticlesLoading} 
-            title={`Verified Insights for ${searchQuery || 'your search'}`}
-          />
+                <div className="space-y-2 pt-2 border-t border-emerald-500/10">
+                  <button
+                    onClick={() => handleSafetyCheck(res)}
+                    disabled={analyzingMedId === res.id}
+                    className="w-full py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-semibold text-emerald-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    {analyzingMedId === res.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    )}
+                    <span>AI Safety Check</span>
+                  </button>
+
+                  <a
+                    href={res.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-white flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all"
+                  >
+                    <span>View at {res.shopName}</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </GlassCard>
+            ))}
+          </div>
         </div>
+      )}
+
+      {/* Recommended Medical Articles & Guidance */}
+      {recommendedArticles.length > 0 && (
+        <ArticleSection articles={recommendedArticles} />
       )}
     </div>
   );

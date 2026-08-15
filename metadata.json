@@ -1,6 +1,6 @@
 {
-  "name": "Remix: Remix: HealthNav AI",
-  "description": "A calm, anime-inspired healthcare navigator for Pan-Asia, featuring Airi assistant, medicine discovery, care matching, and donor verification.",
+  "name": "HealthNav",
+  "description": "An AI-powered healthcare navigation platform with Gemini 3.7 Flash, health timeline, medical records, and privacy center.",
   "requestFramePermissions": [
     "camera",
     "microphone",

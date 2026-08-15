@@ -136,8 +136,14 @@ export type Feedback = {
 
 export type Reminder = {
   id: string;
-  medicineName: string;
-  time: string;
+  medicineName?: string;
+  medicine_name?: string;
+  name?: string;
+  time?: string;
+  reminder_time?: string;
+  dosage?: string;
+  sound?: string;
+  notes?: string;
   taken: boolean;
 };
 
@@ -148,7 +154,52 @@ export type Appointment = {
   date: string;
   time: string;
   type: string;
+  specialty?: string;
+  notes?: string;
+  status?: 'scheduled' | 'completed' | 'cancelled';
 };
+
+export interface VitalsLogEntry {
+  id: string;
+  metricType: 'heartRate' | 'bloodPressure' | 'spO2' | 'weight' | 'bloodGlucose' | 'temperature' | 'sleep' | 'steps';
+  label: string;
+  value: string | number;
+  unit: string;
+  date: string;
+  time?: string;
+  notes?: string;
+  status?: 'Normal' | 'Elevated' | 'Low' | 'Optimal' | 'Attention Needed';
+}
+
+export interface MedicationReminder {
+  id: string;
+  user_id?: string;
+  medicine_name: string;
+  dosage: string;
+  time: string;
+  sound?: string;
+  taken: boolean;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DonorRecord {
+  id: string;
+  type: string;
+  role: 'donor' | 'needer';
+  units?: string;
+  hospital?: string;
+  location?: string;
+  distance?: string;
+  availability?: string;
+  eta?: string;
+  contact?: string;
+  notes?: string;
+  verified?: boolean;
+  status?: 'active' | 'fulfilled' | 'cancelled';
+  createdAt?: string;
+}
 
 export type Activity = {
   id: string;
@@ -176,3 +227,68 @@ export type Article = {
   category: string;
   publishedDate?: string;
 };
+
+export type TimelineEventType = 
+  | 'report' 
+  | 'appointment' 
+  | 'medication' 
+  | 'assessment' 
+  | 'note' 
+  | 'ai_interaction';
+
+export interface TimelineEvent {
+  id: string;
+  title: string;
+  date: string;
+  time?: string;
+  type: TimelineEventType;
+  description: string;
+  details?: string;
+  provider?: string;
+  status?: 'completed' | 'scheduled' | 'action_needed' | 'reviewed';
+  tags?: string[];
+  isDemo?: boolean;
+}
+
+export type RecordCategory = 
+  | 'Lab Reports' 
+  | 'Prescriptions' 
+  | 'Medical Reports' 
+  | 'Imaging' 
+  | 'Vaccination' 
+  | 'Other';
+
+export interface HealthRecord {
+  id: string;
+  title: string;
+  category: RecordCategory;
+  date: string;
+  fileName: string;
+  fileSize: string;
+  status: 'Verified' | 'Processed' | 'Under Review' | 'Archived';
+  provider: string;
+  summary: string;
+  tags: string[];
+  fileUrl?: string;
+  notes?: string;
+  isDemo?: boolean;
+}
+
+export interface AIStructuredResponse {
+  summary: string;
+  possibleConsiderations: string[];
+  recommendedNextSteps: string[];
+  whenToSeekCare: string[];
+  warningSigns: string[];
+  disclaimer: string;
+  rawText?: string;
+}
+
+export interface PrivacyPreferences {
+  shareWithAI: boolean;
+  storeChatHistoryLocally: boolean;
+  anonymousAnalytics: boolean;
+  emergencyAlertConsent: boolean;
+  retentionDays: number;
+}
+

@@ -110,13 +110,13 @@ export const HealthyLivingTab: React.FC = () => {
   };
 
   const filteredRecipes = REAL_RECIPES.filter(r => 
-    r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (r.title || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+    (r.description || '').toLowerCase().includes((searchQuery || '').toLowerCase())
   );
 
   const filteredHabits = REAL_HABITS.filter(h => 
-    h.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    h.content.toLowerCase().includes(searchQuery.toLowerCase())
+    (h.title || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+    (h.content || '').toLowerCase().includes((searchQuery || '').toLowerCase())
   );
 
   return (

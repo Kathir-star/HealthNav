@@ -3,11 +3,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Sidebar, Tab } from './components/Sidebar';
-import { Activity, Heart, Menu } from 'lucide-react';
+import { Activity, Heart, Menu, ShieldCheck } from 'lucide-react';
+import { DashboardTab } from './components/DashboardTab';
+import { AINavigatorTab } from './components/AINavigatorTab';
+import { TimelineTab } from './components/TimelineTab';
+import { RecordsTab } from './components/RecordsTab';
+import { PrivacyCenterTab } from './components/PrivacyCenterTab';
 import { MedicineTab } from './components/MedicineTab';
 import { CareTab } from './components/CareTab';
 import { DonorTab } from './components/DonorTab';
-import { DashboardTab } from './components/DashboardTab';
 import { InsuranceTab } from './components/InsuranceTab';
 import { HealthyLivingTab } from './components/HealthyLivingTab';
 import { SettingsTab } from './components/SettingsTab';
@@ -20,6 +24,10 @@ import { FeedbackModal } from './components/FeedbackModal';
 import { TermsModal } from './components/TermsModal';
 import { OnboardingSurvey } from './components/OnboardingSurvey';
 import { SensorDiagnosis } from './components/SensorDiagnosis';
+import { HealthNavLogo } from './components/HealthNavLogo';
+import { LoadingScreen } from './components/LoadingScreen';
+import { LandingPage } from './pages/LandingPage';
+import { AuthPage } from './pages/AuthPage';
 import { cn } from './lib/utils';
 
 import { authService, DEFAULT_GUEST_USER } from './services/authService';
@@ -32,7 +40,7 @@ const AppContent = ({ user }: { user: SupabaseUser | null }) => {
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
   const [isTermsOpen, setIsTermsOpen] = React.useState(false);
   const [isCameraOpen, setIsCameraOpen] = React.useState(false);
-  const [airiMessage, setAiriMessage] = React.useState<string | undefined>("Welcome to HealthNav! I'm Airi, your real-time health guide.");
+  const [airiMessage, setAiriMessage] = React.useState<string | undefined>("Welcome to HealthNav! I'm your AI health guide.");
   const [airiState, setAiriState] = React.useState<'calm' | 'attentive' | 'urgent'>('calm');
   const [isOnboardingNeeded, setIsOnboardingNeeded] = React.useState(false);
   const [isDiagnosing, setIsDiagnosing] = React.useState(false);
@@ -82,7 +90,6 @@ const AppContent = ({ user }: { user: SupabaseUser | null }) => {
   const executeRefresh = () => {
     setIsRefreshing(true);
     setPullDistance(refreshThreshold / 2);
-    
     setTimeout(() => {
       window.location.reload();
     }, 1000);
@@ -106,13 +113,10 @@ const AppContent = ({ user }: { user: SupabaseUser | null }) => {
 
   const handleSetupDashboard = () => {
     setAiriState('attentive');
-    setAiriMessage("Let's customize your dashboard! What health goals should we focus on?");
+    setAiriMessage("Let's customize your health dashboard!");
     setTimeout(() => {
-      setAiriMessage("Great! I'll prioritize hydration tips and medication reminders for you.");
-      setTimeout(() => {
-        setAiriState('calm');
-        setAiriMessage(undefined);
-      }, 3000);
+      setAiriState('calm');
+      setAiriMessage(undefined);
     }, 3000);
   };
 
@@ -120,7 +124,7 @@ const AppContent = ({ user }: { user: SupabaseUser | null }) => {
     setIsCameraOpen(false);
     setActiveTab('medicine');
     setAiriState('calm');
-    setAiriMessage(`I've found details for ${medicine}. Let's check the best prices!`);
+    setAiriMessage(`I've found details for ${medicine}. Let's check the verified safety interactions!`);
   };
 
   return (
@@ -150,31 +154,29 @@ const AppContent = ({ user }: { user: SupabaseUser | null }) => {
       </div>
 
       {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 glass border-b border-white/10 z-[80] flex items-center justify-between px-6">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center neon-glow-teal">
-            <Heart className="text-white w-5 h-5" />
-          </div>
-          <h1 className="text-lg font-bold text-emerald-50 tracking-tight">HealthNav</h1>
-        </div>
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 glass border-b border-white/10 z-[80] flex items-center justify-between px-4 sm:px-6 bg-emerald-950/90 backdrop-blur-md">
+        <HealthNavLogo size="sm" showSubtitle={false} onClick={() => setActiveTab('dashboard')} />
         <button 
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 rounded-xl hover:bg-white/10 text-emerald-100/60"
+          className="p-2 rounded-xl hover:bg-white/10 text-emerald-100/60 cursor-pointer"
         >
           <Menu className="w-6 h-6" />
         </button>
       </header>
 
-      {/* Nature-Themed Background */}
-      <div className="fixed inset-0 -z-10">
-        <img 
-          src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=1200&auto=format&fit=crop" 
-          alt="Forest Nature" 
-          className="w-full h-full object-cover opacity-10"
-          referrerPolicy="no-referrer"
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-950 via-emerald-950/98 to-emerald-900/95 backdrop-blur-[1px]" />
+      {/* Subtle Healthcare & Navigation Geometry Pattern */}
+      <div className="fixed inset-0 -z-10 pointer-events-none opacity-[0.06] overflow-hidden">
+        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+          <defs>
+            <pattern id="app-content-grid" width="48" height="48" patternUnits="userSpaceOnUse">
+              <path d="M 48 0 L 0 0 0 48" fill="none" stroke="#10b981" strokeWidth="1" strokeDasharray="2 4" />
+              <circle cx="24" cy="24" r="1.5" fill="#10b981" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#app-content-grid)" />
+        </svg>
       </div>
+      <div className="fixed inset-0 -z-10 bg-gradient-to-br from-emerald-950 via-emerald-950/98 to-emerald-900/95 pointer-events-none" />
 
       <Sidebar 
         activeTab={activeTab} 
@@ -190,12 +192,31 @@ const AppContent = ({ user }: { user: SupabaseUser | null }) => {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18 }}
             >
-              {activeTab === 'dashboard' && <DashboardTab onSetupClick={handleSetupDashboard} />}
+              {activeTab === 'dashboard' && (
+                <DashboardTab 
+                  onSetupClick={handleSetupDashboard} 
+                  onSelectTab={(tab) => setActiveTab(tab as Tab)}
+                />
+              )}
+              {activeTab === 'ai_navigator' && (
+                <AINavigatorTab 
+                  onSelectTab={(tab) => setActiveTab(tab as Tab)}
+                />
+              )}
+              {activeTab === 'timeline' && <TimelineTab />}
+              {activeTab === 'records' && (
+                <RecordsTab 
+                  onAskAI={(prompt) => {
+                    setActiveTab('ai_navigator');
+                  }}
+                />
+              )}
+              {activeTab === 'privacy' && <PrivacyCenterTab />}
               {activeTab === 'medicine' && <MedicineTab />}
               {activeTab === 'care' && <CareTab />}
               {activeTab === 'donor' && <DonorTab />}
@@ -259,24 +280,57 @@ const AppContent = ({ user }: { user: SupabaseUser | null }) => {
 
 export default function App() {
   const [user, setUser] = React.useState<SupabaseUser | null>(DEFAULT_GUEST_USER as any);
+  const [isInitializing, setIsInitializing] = React.useState(true);
+  const [initError, setInitError] = React.useState<string | null>(null);
+
+  const initializeApp = React.useCallback(async () => {
+    setIsInitializing(true);
+    setInitError(null);
+    try {
+      const currentUser = await authService.getCurrentUser();
+      setUser(currentUser || (DEFAULT_GUEST_USER as any));
+      setIsInitializing(false);
+    } catch (err: any) {
+      console.error('HealthNav initialization error:', err);
+      // If error occurs, capture message so user has real retry action
+      setInitError(err?.message || 'Unable to establish secure health navigation connection.');
+      setIsInitializing(false);
+    }
+  }, []);
 
   React.useEffect(() => {
+    initializeApp();
     const { data: { subscription } } = authService.onAuthStateChange((currentUser) => {
       setUser(currentUser || (DEFAULT_GUEST_USER as any));
     });
     return () => subscription?.unsubscribe?.();
-  }, []);
+  }, [initializeApp]);
 
   return (
     <BrowserRouter>
       <Toaster position="top-center" richColors />
+      
+      {/* Intro & Real Initialization Loading Overlay */}
+      <AnimatePresence mode="wait">
+        {isInitializing ? (
+          <LoadingScreen key="loading" />
+        ) : initError ? (
+          <LoadingScreen 
+            key="error" 
+            error={initError} 
+            onRetry={initializeApp} 
+          />
+        ) : null}
+      </AnimatePresence>
+
       <Routes>
         <Route path="/" element={<AppContent user={user} />} />
         <Route path="/dashboard" element={<AppContent user={user} />} />
-        <Route path="/auth/*" element={<Navigate to="/" replace />} />
+        <Route path="/app" element={<AppContent user={user} />} />
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/auth/*" element={<AuthPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
 }
-

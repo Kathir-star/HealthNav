@@ -72,13 +72,23 @@ async function startServer() {
       const apiKey = process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
-        return res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
+        return res.status(503).json({ 
+          error: "HealthNav AI is temporarily unconfigured (GEMINI_API_KEY missing).",
+          text: "HealthNav AI is ready. Please configure your GEMINI_API_KEY in project settings to enable active real-time intelligence."
+        });
       }
 
-      const genAI = new GoogleGenAI({ apiKey });
+      const genAI = new GoogleGenAI({ 
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
       
       const result = await genAI.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.7-flash",
         contents: contents || prompt,
         config: {
           systemInstruction: systemInstruction || undefined,
@@ -90,7 +100,98 @@ async function startServer() {
       res.json({ text: result.text });
     } catch (error: any) {
       console.error("AI Error:", error);
-      res.status(500).json({ error: error.message || "Failed to generate AI response" });
+      res.status(500).json({ error: error.message || "HealthNav AI is temporarily unavailable. Please try again." });
+    }
+  });
+
+  // Dedicated Structured Health Navigator API
+  app.post("/api/navigator/analyze", async (req, res) => {
+    try {
+      const { query, userContext } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey) {
+        return res.json({
+          summary: `You asked: "${query}".`,
+          possibleConsiderations: [
+            "General health education and navigation insights require active AI connectivity.",
+            "Always consult your primary care doctor for individualized evaluation."
+          ],
+          recommendedNextSteps: [
+            "Write down your symptoms, start dates, and any related questions.",
+            "Schedule a routine appointment with a licensed physician or specialist."
+          ],
+          whenToSeekCare: [
+            "If symptoms are worsening, persistent, or causing distress.",
+            "Schedule follow-up if you notice unexpected changes in daily vitals."
+          ],
+          warningSigns: [
+            "Sudden severe pain, chest tightness, shortness of breath, or confusion."
+          ],
+          disclaimer: "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
+        });
+      }
+
+      const genAI = new GoogleGenAI({ 
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+      const systemInstruction = `You are HealthNav AI, an advanced, highly empathetic, and evidence-informed Healthcare Navigation Assistant.
+Your mission is to help patients understand complex health concepts, clarify medical terms or lab readings, organize questions for their healthcare providers, and safely navigate their next steps.
+
+Safety Boundaries:
+- NEVER pretend to be a practicing physician or offer a definitive clinical diagnosis.
+- NEVER prescribe medication changes or discourage seeking emergency care.
+- Always provide structured, calming, high-clarity insights.
+- Always include red-flag warning signs and the standard non-diagnostic disclaimer.
+
+Return ONLY a valid JSON object matching this schema:
+{
+  "summary": "Clear, concise 2-sentence summary answering the user's question directly in accessible language",
+  "possibleConsiderations": ["Bullet point 1 on what this generally means", "Bullet point 2 on common factors or contexts"],
+  "recommendedNextSteps": ["Actionable step 1 (e.g. questions to ask doctor)", "Actionable step 2 (e.g. preparation or tracking)"],
+  "whenToSeekCare": ["When routine clinical evaluation is recommended", "Follow-up timelines"],
+  "warningSigns": ["Red flags requiring immediate medical attention (e.g. severe shortness of breath, acute chest discomfort)"],
+  "disclaimer": "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
+}`;
+
+      const contents = `${userContext ? `User Profile Context: ${JSON.stringify(userContext)}\n\n` : ''}User Health Query: ${query}`;
+
+      const result = await genAI.models.generateContent({
+        model: "gemini-3.7-flash",
+        contents,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json"
+        }
+      });
+
+      const parsed = JSON.parse(result.text || "{}");
+      res.json(parsed);
+    } catch (err: any) {
+      console.error("Navigator API Error:", err);
+      res.json({
+        summary: `Guidance on: "${req.body.query || 'Health query'}"`,
+        possibleConsiderations: [
+          "Health conditions vary significantly depending on personal history, lifestyle, and clinical context.",
+          "Laboratory results and physiological readings should always be evaluated alongside clinical symptoms."
+        ],
+        recommendedNextSteps: [
+          "Document any specific symptoms, durations, and medication lists.",
+          "Discuss these findings directly with your personal physician."
+        ],
+        whenToSeekCare: [
+          "If you experience persistent discomfort, unexplained fatigue, or escalating symptoms."
+        ],
+        warningSigns: [
+          "Acute chest pain, severe shortness of breath, sudden weakness or numbness, or high persistent fever."
+        ],
+        disclaimer: "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
+      });
     }
   });
 
@@ -190,21 +291,40 @@ async function startServer() {
       let aiResponse = "";
 
       if (apiKey) {
-        const genAI = new GoogleGenAI({ apiKey });
+        const genAI = new GoogleGenAI({ 
+          apiKey,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            }
+          }
+        });
         
         const userContext = profile ? `
-### USER DATA
+### USER HEALTH PROFILE CONTEXT
 * Age: ${profile.profile?.age || 'Not specified'}
 * Weight: ${profile.profile?.weight || 'Not specified'}kg
 * Gender: ${profile.profile?.gender || 'Not specified'}
-* Medical conditions: ${(profile.health?.conditions || []).join(", ") || "None"}
-* Allergies: ${(profile.health?.allergies || []).join(", ") || "None"}
+* Medical conditions: ${(profile.health?.conditions || []).join(", ") || "None recorded"}
+* Known allergies: ${(profile.health?.allergies || []).join(", ") || "None"}
 * Pregnancy status: ${profile.pregnancy?.status?.replace("_", " ") || "Not pregnant"}
-` : "No profile data available.";
+` : "No individual profile data provided.";
 
-        const systemPrompt = `You are Airi, a compassionate, hyper-intelligent AI healthcare companion for Pan-Asia. 
-Provide clear, empathetic, and evidence-informed health guidance. Always prioritize patient safety.
-If a medical situation is critical or life-threatening, urge seeking immediate emergency care (e.g. 102/emergency services).
+        const systemPrompt = `You are HealthNav AI, the trusted AI Healthcare Navigator.
+Your role is to help users navigate their health questions, understand medical terms and reports, prepare for doctor visits, and identify when to seek professional care.
+
+Communication Guidelines:
+1. Tone: Calm, compassionate, objective, and clear.
+2. Structure your replies clearly using markdown headers where helpful:
+   - **Summary & Understanding**
+   - **What This Could Mean**
+   - **Recommended Next Steps & Doctor Questions**
+   - **When to Seek Care & Warning Signs**
+3. Emphasize that you provide health navigation and educational clarity, not medical diagnoses.
+4. If a symptom sounds potentially emergent (severe chest pain, breathing difficulty, sudden speech or mobility loss), immediately urge calling emergency services (such as 102 / 911).
+5. Conclude with:
+*Disclaimer: HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice.*
+
 ${userContext}`;
 
         const contents = historyItems.map(m => ({
@@ -214,27 +334,17 @@ ${userContext}`;
 
         try {
           const result = await genAI.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3.7-flash",
             contents,
             config: { systemInstruction: systemPrompt }
           });
-          aiResponse = result.text || "I'm here to support your health journey. How else can I assist you today?";
+          aiResponse = result.text || "I am your HealthNav AI Assistant. How can I help you navigate your health today?";
         } catch (geminiError: any) {
           console.error("Gemini call error:", geminiError);
-          // Fallback to flash-1.5 or helpful message
-          try {
-            const fallbackResult = await genAI.models.generateContent({
-              model: "gemini-1.5-flash",
-              contents,
-              config: { systemInstruction: systemPrompt }
-            });
-            aiResponse = fallbackResult.text || "I understand your concern. Please consult a qualified physician for clinical diagnosis.";
-          } catch {
-            aiResponse = "I am Airi, your healthcare navigator. I've noted your query and recommend consulting a healthcare provider for personalized medical evaluation.";
-          }
+          aiResponse = "HealthNav AI is currently handling high volume. Please check your query or consult a healthcare provider for immediate medical advice.\n\n*Disclaimer: HealthNav provides AI-assisted health information and navigation.*";
         }
       } else {
-        aiResponse = "Hello! I am Airi, your AI health navigator. Please ensure the GEMINI_API_KEY is configured in your project settings to enable active AI consultations.";
+        aiResponse = "Welcome to HealthNav! I am your AI Health Navigator. I can help explain medical terms, organize questions for your physician, and review general health guidance.\n\nTo enable live generative analysis, ensure your GEMINI_API_KEY is configured in project settings.\n\n*Disclaimer: HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice.*";
       }
 
       // Save AI Response

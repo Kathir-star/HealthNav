@@ -1,5 +1,70 @@
-import { HealthProfile } from "../types";
+import { HealthProfile, AIStructuredResponse } from "../types";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
+
+export async function analyzeWithHealthNavigator(
+  query: string, 
+  profile: HealthProfile | null
+): Promise<AIStructuredResponse> {
+  try {
+    const userContext = profile ? {
+      age: profile.profile?.age,
+      conditions: profile.health?.conditions || [],
+      allergies: profile.health?.allergies || [],
+      pregnancy: profile.pregnancy?.status
+    } : null;
+
+    const response = await fetch("/api/navigator/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, userContext })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      summary: data.summary || "Health navigation insight provided based on available clinical references.",
+      possibleConsiderations: Array.isArray(data.possibleConsiderations) ? data.possibleConsiderations : [
+        "Health parameters should be interpreted in the context of comprehensive clinical evaluations.",
+        "Individual variation is common across different age groups and lifestyles."
+      ],
+      recommendedNextSteps: Array.isArray(data.recommendedNextSteps) ? data.recommendedNextSteps : [
+        "Track frequency, severity, and any associated changes in daily habits.",
+        "Consult your physician for personalized medical advice."
+      ],
+      whenToSeekCare: Array.isArray(data.whenToSeekCare) ? data.whenToSeekCare : [
+        "If you experience persistent or worsening symptoms.",
+        "During regularly scheduled annual checkups."
+      ],
+      warningSigns: Array.isArray(data.warningSigns) ? data.warningSigns : [
+        "Severe acute pain, shortness of breath, sudden weakness, or high fever."
+      ],
+      disclaimer: data.disclaimer || "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
+    };
+  } catch (error) {
+    console.error("Health Navigator Error:", error);
+    return {
+      summary: `Educational summary regarding "${query}".`,
+      possibleConsiderations: [
+        "Health concerns benefit from structured documentation and clinical evaluation.",
+        "Every individual has unique physiological baseline metrics."
+      ],
+      recommendedNextSteps: [
+        "Keep a log of symptoms, timestamps, and current medications.",
+        "Present your log to your healthcare provider during your next consultation."
+      ],
+      whenToSeekCare: [
+        "Seek medical consultation if symptoms interfere with daily living or fail to improve."
+      ],
+      warningSigns: [
+        "Chest pain or pressure, severe breathing difficulty, sudden confusion, or acute injury."
+      ],
+      disclaimer: "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
+    };
+  }
+}
 
 async function callAiApi(payload: any) {
   const response = await fetch("/api/ai", {
@@ -122,13 +187,13 @@ export async function getChatResponse(message: string, conversationId: string | 
 export async function getAiriResponse(message: string, profile: HealthProfile | null) {
   try {
     const userContext = profile ? `
-### USER DATA (FROM FIREBASE)
-* Age: ${profile.profile.age}
-* Weight: ${profile.profile.weight}kg
-* Gender: ${profile.profile.gender}
-* Medical conditions: ${profile.health.conditions.join(", ") || "None"}
-* Allergies: ${profile.health.allergies.join(", ") || "None"}
-* Pregnancy status: ${profile.pregnancy.status.replace("_", " ")}
+### USER DATA (CLINICAL PROFILE)
+* Age: ${profile.profile?.age ?? 28}
+* Weight: ${profile.profile?.weight ?? 70}kg
+* Gender: ${profile.profile?.gender ?? 'male'}
+* Medical conditions: ${profile.health?.conditions?.join?.(", ") || "None reported"}
+* Allergies: ${profile.health?.allergies?.join?.(", ") || "None reported"}
+* Pregnancy status: ${profile.pregnancy?.status?.replace?.("_", " ") || "not pregnant"}
 ` : "### USER DATA\nNo profile data available. Ask user for basic health info if needed for safety.";
 
     const result = await callAiApi({
