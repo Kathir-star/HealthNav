@@ -3,20 +3,23 @@ import { supabase, isSupabaseConfigured } from "../lib/supabase";
 
 export async function analyzeWithHealthNavigator(
   query: string, 
-  profile: HealthProfile | null
+  profile: HealthProfile | null,
+  history?: { role: string; content: string }[]
 ): Promise<AIStructuredResponse> {
   try {
     const userContext = profile ? {
       age: profile.profile?.age,
+      gender: profile.profile?.gender,
+      weight: profile.profile?.weight,
       conditions: profile.health?.conditions || [],
       allergies: profile.health?.allergies || [],
       pregnancy: profile.pregnancy?.status
     } : null;
 
-    const response = await fetch("/api/navigator/analyze", {
+    const response = await fetch("/api/gemini/navigator", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, userContext })
+      body: JSON.stringify({ query, userContext, history })
     });
 
     if (!response.ok) {
@@ -26,27 +29,44 @@ export async function analyzeWithHealthNavigator(
     const data = await response.json();
     return {
       summary: data.summary || "Health navigation insight provided based on available clinical references.",
-      possibleConsiderations: Array.isArray(data.possibleConsiderations) ? data.possibleConsiderations : [
-        "Health parameters should be interpreted in the context of comprehensive clinical evaluations.",
-        "Individual variation is common across different age groups and lifestyles."
-      ],
-      recommendedNextSteps: Array.isArray(data.recommendedNextSteps) ? data.recommendedNextSteps : [
-        "Track frequency, severity, and any associated changes in daily habits.",
-        "Consult your physician for personalized medical advice."
-      ],
-      whenToSeekCare: Array.isArray(data.whenToSeekCare) ? data.whenToSeekCare : [
-        "If you experience persistent or worsening symptoms.",
-        "During regularly scheduled annual checkups."
-      ],
-      warningSigns: Array.isArray(data.warningSigns) ? data.warningSigns : [
-        "Severe acute pain, shortness of breath, sudden weakness, or high fever."
-      ],
+      keyTakeaway: data.keyTakeaway,
+      possibleConsiderations: Array.isArray(data.possibleConsiderations) && data.possibleConsiderations.length > 0 
+        ? data.possibleConsiderations 
+        : [
+          "Health parameters should be interpreted in the context of comprehensive clinical evaluations.",
+          "Individual variation is common across different age groups and lifestyles."
+        ],
+      recommendedNextSteps: Array.isArray(data.recommendedNextSteps) && data.recommendedNextSteps.length > 0 
+        ? data.recommendedNextSteps 
+        : [
+          "Track frequency, severity, and any associated changes in daily habits.",
+          "Consult your physician for personalized medical advice."
+        ],
+      whenToSeekCare: Array.isArray(data.whenToSeekCare) && data.whenToSeekCare.length > 0 
+        ? data.whenToSeekCare 
+        : [
+          "If you experience persistent or worsening symptoms.",
+          "During regularly scheduled annual checkups."
+        ],
+      warningSigns: Array.isArray(data.warningSigns) && data.warningSigns.length > 0 
+        ? data.warningSigns 
+        : [
+          "Severe acute pain, shortness of breath, sudden weakness, or high fever."
+        ],
+      suggestedFollowUps: Array.isArray(data.suggestedFollowUps) 
+        ? data.suggestedFollowUps 
+        : [
+          "What questions should I ask my doctor about this?",
+          "Are there lifestyle modifications that can help?",
+          "How can I track my symptoms effectively before my appointment?"
+        ],
       disclaimer: data.disclaimer || "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
     };
   } catch (error) {
     console.error("Health Navigator Error:", error);
     return {
       summary: `Educational summary regarding "${query}".`,
+      keyTakeaway: "Track your symptoms and consult your healthcare provider for individualized care.",
       possibleConsiderations: [
         "Health concerns benefit from structured documentation and clinical evaluation.",
         "Every individual has unique physiological baseline metrics."
@@ -60,6 +80,11 @@ export async function analyzeWithHealthNavigator(
       ],
       warningSigns: [
         "Chest pain or pressure, severe breathing difficulty, sudden confusion, or acute injury."
+      ],
+      suggestedFollowUps: [
+        "What questions should I ask my doctor about this?",
+        "Are there lifestyle modifications that can help?",
+        "How can I track my symptoms effectively before my appointment?"
       ],
       disclaimer: "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
     };

@@ -65,7 +65,30 @@ async function startServer() {
     }
   };
 
-  // AI API Route (General)
+  // Helper to parse JSON from model output safely
+  function parseModelJson<T>(rawText: string, fallback: T): T {
+    if (!rawText) return fallback;
+    try {
+      return JSON.parse(rawText);
+    } catch {
+      try {
+        const match = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+          return JSON.parse(match[1]);
+        }
+        const firstBrace = rawText.indexOf('{');
+        const lastBrace = rawText.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+          return JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
+        }
+      } catch (e) {
+        console.warn("Failed to extract JSON from model output:", e);
+      }
+    }
+    return fallback;
+  }
+
+  // AI API Route (General Gemini Proxy)
   app.post("/api/ai", async (req, res) => {
     try {
       const { prompt, contents, history, systemInstruction, responseMimeType, responseSchema } = req.body;
@@ -104,34 +127,48 @@ async function startServer() {
     }
   });
 
-  // Dedicated Structured Health Navigator API
-  app.post("/api/navigator/analyze", async (req, res) => {
+  // Handler for Health Navigator requests (Shared by /api/gemini/navigator and /api/navigator/analyze)
+  const handleHealthNavigator = async (req: express.Request, res: express.Response) => {
+    const userQuery = req.body.query || req.body.message || req.body.prompt || "General health inquiry";
+    const userContext = req.body.userContext || req.body.profile || null;
+    const history = req.body.history || [];
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    const fallbackResponse = {
+      summary: `Here is structured health guidance regarding: "${userQuery}".`,
+      keyTakeaway: "Always maintain an open line of communication with your physician regarding changes in health.",
+      possibleConsiderations: [
+        "Health symptoms and physiological readings must be evaluated in the context of individual medical history.",
+        "Lifestyle factors, sleep quality, hydration, stress levels, and nutrition play a significant role in baseline wellness.",
+        "Variations in lab results or symptoms may be transient or indicate conditions that warrant routine clinical review."
+      ],
+      recommendedNextSteps: [
+        "Document the timeline, severity, frequency, and any triggers related to your question.",
+        "Create a list of your current medications, supplements, and allergies before your appointment.",
+        "Schedule a consultation with your primary care provider or appropriate specialist."
+      ],
+      whenToSeekCare: [
+        "Schedule a routine appointment if symptoms persist for more than a few days without improvement.",
+        "Seek prompt medical review if symptoms noticeably worsen or interfere with daily activities."
+      ],
+      warningSigns: [
+        "Sudden severe pain, chest tightness or pressure, difficulty breathing.",
+        "Sudden confusion, speech difficulty, weakness or numbness in the face or limbs.",
+        "High persistent fever, uncontrolled bleeding, or fainting."
+      ],
+      suggestedFollowUps: [
+        "What questions should I ask my doctor about this?",
+        "Are there lifestyle modifications that can help?",
+        "How can I track my symptoms effectively before my appointment?"
+      ],
+      disclaimer: "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
+    };
+
+    if (!apiKey) {
+      return res.json(fallbackResponse);
+    }
+
     try {
-      const { query, userContext } = req.body;
-      const apiKey = process.env.GEMINI_API_KEY;
-
-      if (!apiKey) {
-        return res.json({
-          summary: `You asked: "${query}".`,
-          possibleConsiderations: [
-            "General health education and navigation insights require active AI connectivity.",
-            "Always consult your primary care doctor for individualized evaluation."
-          ],
-          recommendedNextSteps: [
-            "Write down your symptoms, start dates, and any related questions.",
-            "Schedule a routine appointment with a licensed physician or specialist."
-          ],
-          whenToSeekCare: [
-            "If symptoms are worsening, persistent, or causing distress.",
-            "Schedule follow-up if you notice unexpected changes in daily vitals."
-          ],
-          warningSigns: [
-            "Sudden severe pain, chest tightness, shortness of breath, or confusion."
-          ],
-          disclaimer: "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
-        });
-      }
-
       const genAI = new GoogleGenAI({ 
         apiKey,
         httpOptions: {
@@ -140,60 +177,101 @@ async function startServer() {
           }
         }
       });
-      const systemInstruction = `You are HealthNav AI, an advanced, highly empathetic, and evidence-informed Healthcare Navigation Assistant.
-Your mission is to help patients understand complex health concepts, clarify medical terms or lab readings, organize questions for their healthcare providers, and safely navigate their next steps.
 
-Safety Boundaries:
-- NEVER pretend to be a practicing physician or offer a definitive clinical diagnosis.
-- NEVER prescribe medication changes or discourage seeking emergency care.
-- Always provide structured, calming, high-clarity insights.
-- Always include red-flag warning signs and the standard non-diagnostic disclaimer.
+      const systemInstruction = `You are HealthNav AI, an advanced, empathetic, and evidence-informed Healthcare Navigation Assistant powered by clinical knowledge.
+Your mission is to provide clear, thorough, compassionate, and actionable answers to health-related questions, explain complex medical concepts and lab results, guide patients on what to expect, and organize practical questions for their doctor.
+
+Core Guidelines:
+1. Answer the user's specific question directly and accurately in the "summary" and "possibleConsiderations".
+2. Break down medical jargon into simple, reassuring, and intuitive language.
+3. Be structured, objective, and deeply supportive.
+4. Highlight concrete questions the user can bring to their doctor.
+5. Identify clear red-flag warning signs that require emergency or urgent medical evaluation.
+6. Suggest 3 thoughtful follow-up questions the patient might want to ask next.
+7. Safety: Do not provide definitive diagnoses or alter prescriptions; emphasize that you provide educational clarity and healthcare navigation.
 
 Return ONLY a valid JSON object matching this schema:
 {
-  "summary": "Clear, concise 2-sentence summary answering the user's question directly in accessible language",
-  "possibleConsiderations": ["Bullet point 1 on what this generally means", "Bullet point 2 on common factors or contexts"],
-  "recommendedNextSteps": ["Actionable step 1 (e.g. questions to ask doctor)", "Actionable step 2 (e.g. preparation or tracking)"],
-  "whenToSeekCare": ["When routine clinical evaluation is recommended", "Follow-up timelines"],
-  "warningSigns": ["Red flags requiring immediate medical attention (e.g. severe shortness of breath, acute chest discomfort)"],
+  "summary": "Direct, empathetic, and comprehensive 2-3 sentence answer addressing the user's query specifically.",
+  "keyTakeaway": "A single crisp, high-impact sentence highlighting the most important thing to know.",
+  "possibleConsiderations": [
+    "Detailed point 1 explaining the underlying physiological context or common causes",
+    "Detailed point 2 explaining related contributing factors (e.g. lifestyle, medications, diet)",
+    "Detailed point 3 explaining how doctors typically evaluate this"
+  ],
+  "recommendedNextSteps": [
+    "Actionable step 1 (e.g. specific tracking, symptom log parameters)",
+    "Actionable step 2 (e.g. specific questions to ask their doctor)",
+    "Actionable step 3 (e.g. preparatory steps before medical evaluation)"
+  ],
+  "whenToSeekCare": [
+    "Specific timeline or thresholds for scheduling a non-emergency appointment with a doctor",
+    "Signs indicating that evaluation shouldn't be delayed"
+  ],
+  "warningSigns": [
+    "Red flag symptom 1 requiring immediate/emergency medical evaluation",
+    "Red flag symptom 2 (e.g. severe shortness of breath, acute pain, neurological changes)"
+  ],
+  "suggestedFollowUps": [
+    "Specific follow-up question 1 related to their topic",
+    "Specific follow-up question 2",
+    "Specific follow-up question 3"
+  ],
   "disclaimer": "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
 }`;
 
-      const contents = `${userContext ? `User Profile Context: ${JSON.stringify(userContext)}\n\n` : ''}User Health Query: ${query}`;
+      let promptContent = "";
+      if (userContext) {
+        promptContent += `User Profile Context:\nAge: ${userContext.age || 'Not specified'}, Gender: ${userContext.gender || 'Not specified'}, Weight: ${userContext.weight || 'Not specified'}kg, Known Conditions: ${(userContext.conditions || []).join(', ') || 'None'}, Allergies: ${(userContext.allergies || []).join(', ') || 'None'}, Pregnancy: ${userContext.pregnancy || 'No'}\n\n`;
+      }
+      if (history && history.length > 0) {
+        promptContent += `Recent Prior Context:\n${history.map((h: any) => `${h.role}: ${h.content}`).join('\n')}\n\n`;
+      }
+      promptContent += `User Health Query: ${userQuery}`;
 
       const result = await genAI.models.generateContent({
         model: "gemini-3.7-flash",
-        contents,
+        contents: promptContent,
         config: {
           systemInstruction,
           responseMimeType: "application/json"
         }
       });
 
-      const parsed = JSON.parse(result.text || "{}");
-      res.json(parsed);
+      const parsed = parseModelJson(result.text || "", fallbackResponse);
+      
+      // Ensure all fields are populated properly
+      const finalResult = {
+        summary: parsed.summary || fallbackResponse.summary,
+        keyTakeaway: parsed.keyTakeaway || fallbackResponse.keyTakeaway,
+        possibleConsiderations: Array.isArray(parsed.possibleConsiderations) && parsed.possibleConsiderations.length > 0 
+          ? parsed.possibleConsiderations 
+          : fallbackResponse.possibleConsiderations,
+        recommendedNextSteps: Array.isArray(parsed.recommendedNextSteps) && parsed.recommendedNextSteps.length > 0 
+          ? parsed.recommendedNextSteps 
+          : fallbackResponse.recommendedNextSteps,
+        whenToSeekCare: Array.isArray(parsed.whenToSeekCare) && parsed.whenToSeekCare.length > 0 
+          ? parsed.whenToSeekCare 
+          : fallbackResponse.whenToSeekCare,
+        warningSigns: Array.isArray(parsed.warningSigns) && parsed.warningSigns.length > 0 
+          ? parsed.warningSigns 
+          : fallbackResponse.warningSigns,
+        suggestedFollowUps: Array.isArray(parsed.suggestedFollowUps) && parsed.suggestedFollowUps.length > 0
+          ? parsed.suggestedFollowUps
+          : fallbackResponse.suggestedFollowUps,
+        disclaimer: parsed.disclaimer || fallbackResponse.disclaimer,
+      };
+
+      res.json(finalResult);
     } catch (err: any) {
-      console.error("Navigator API Error:", err);
-      res.json({
-        summary: `Guidance on: "${req.body.query || 'Health query'}"`,
-        possibleConsiderations: [
-          "Health conditions vary significantly depending on personal history, lifestyle, and clinical context.",
-          "Laboratory results and physiological readings should always be evaluated alongside clinical symptoms."
-        ],
-        recommendedNextSteps: [
-          "Document any specific symptoms, durations, and medication lists.",
-          "Discuss these findings directly with your personal physician."
-        ],
-        whenToSeekCare: [
-          "If you experience persistent discomfort, unexplained fatigue, or escalating symptoms."
-        ],
-        warningSigns: [
-          "Acute chest pain, severe shortness of breath, sudden weakness or numbness, or high persistent fever."
-        ],
-        disclaimer: "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
-      });
+      console.error("Health Navigator API Error:", err);
+      res.json(fallbackResponse);
     }
-  });
+  };
+
+  // Dedicated Secure Gemini Health Navigator Endpoints
+  app.post("/api/gemini/navigator", handleHealthNavigator);
+  app.post("/api/navigator/analyze", handleHealthNavigator);
 
   // --- Chat System APIs ---
 

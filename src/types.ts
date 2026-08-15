@@ -276,10 +276,12 @@ export interface HealthRecord {
 
 export interface AIStructuredResponse {
   summary: string;
+  keyTakeaway?: string;
   possibleConsiderations: string[];
   recommendedNextSteps: string[];
   whenToSeekCare: string[];
   warningSigns: string[];
+  suggestedFollowUps?: string[];
   disclaimer: string;
   rawText?: string;
 }

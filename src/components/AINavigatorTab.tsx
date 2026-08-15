@@ -1,12 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, Send, Mic, Volume2, VolumeX, Copy, RefreshCw, Trash2, 
   AlertTriangle, ShieldCheck, ChevronRight, Check, HeartPulse, HelpCircle, 
-  FileText, Stethoscope, AlertCircle, ArrowUpRight, MessageSquare, Info
+  FileText, Stethoscope, ArrowUpRight, MessageSquare, Info, Lightbulb, MessageCircleQuestion
 } from 'lucide-react';
 import { GlassCard } from './GlassCard';
-import { analyzeWithHealthNavigator, getChatResponse } from '../services/geminiService';
+import { analyzeWithHealthNavigator } from '../services/geminiService';
 import { useProfile } from '../hooks/useProfile';
 import { SUGGESTED_AI_PROMPTS } from '../constants';
 import { AIStructuredResponse } from '../types';
@@ -21,6 +21,7 @@ export const AINavigatorTab: React.FC<AINavigatorTabProps> = ({ onSelectTab }) =
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [structuredResult, setStructuredResult] = useState<AIStructuredResponse | null>(null);
+  const [activeQuery, setActiveQuery] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isVoiceOutput, setIsVoiceOutput] = useState(false);
@@ -34,16 +35,23 @@ export const AINavigatorTab: React.FC<AINavigatorTabProps> = ({ onSelectTab }) =
 
     setLoading(true);
     setQuery(textToSubmit);
+    setActiveQuery(textToSubmit);
+
+    // Build recent context for multi-turn navigation
+    const recentHistory = history.slice(0, 3).flatMap(h => [
+      { role: 'user', content: h.query },
+      { role: 'model', content: h.result.summary }
+    ]);
 
     try {
-      const result = await analyzeWithHealthNavigator(textToSubmit, profile);
+      const result = await analyzeWithHealthNavigator(textToSubmit, profile, recentHistory);
       setStructuredResult(result);
       setHistory(prev => [
         { query: textToSubmit, result, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-        ...prev.slice(0, 7)
+        ...prev.filter(p => p.query !== textToSubmit).slice(0, 6)
       ]);
 
-      if (isVoiceOutput) {
+      if (isVoiceOutput && result.summary) {
         speakResponse(result.summary);
       }
 
@@ -75,7 +83,7 @@ export const AINavigatorTab: React.FC<AINavigatorTabProps> = ({ onSelectTab }) =
       setIsListening(false);
       return;
     }
-    const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechAPI) {
       toast.error('Voice input is not supported in this browser.');
       return;
@@ -101,19 +109,23 @@ export const AINavigatorTab: React.FC<AINavigatorTabProps> = ({ onSelectTab }) =
   const handleCopy = () => {
     if (!structuredResult) return;
     const copyText = `
-HealthNav AI Analysis:
+HealthNav AI Healthcare Navigation
+Query: ${activeQuery}
+
+Summary:
 ${structuredResult.summary}
 
-Possible Considerations:
+${structuredResult.keyTakeaway ? `Key Takeaway:\n${structuredResult.keyTakeaway}\n` : ''}
+What This Could Mean:
 ${structuredResult.possibleConsiderations.map(c => `• ${c}`).join('\n')}
 
-Recommended Next Steps:
+Actionable Next Steps & Doctor Questions:
 ${structuredResult.recommendedNextSteps.map(s => `• ${s}`).join('\n')}
 
-When to Seek Care:
+When to Seek Professional Care:
 ${structuredResult.whenToSeekCare.map(w => `• ${w}`).join('\n')}
 
-Warning Signs:
+Warning Signs & Red Flags:
 ${structuredResult.warningSigns.map(w => `• ${w}`).join('\n')}
 
 ${structuredResult.disclaimer}
@@ -128,6 +140,10 @@ ${structuredResult.disclaimer}
   const handleClear = () => {
     setStructuredResult(null);
     setQuery('');
+    setActiveQuery('');
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     toast.info('Conversation cleared');
   };
 
@@ -289,14 +305,14 @@ ${structuredResult.disclaimer}
             >
               {/* Main Analysis Card */}
               <GlassCard className="p-6 sm:p-8 border-emerald-500/30 space-y-6 relative">
-                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-500/20 pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center shrink-0">
                       <Sparkles className="w-5 h-5 text-emerald-300" />
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-white">Healthcare Navigation Analysis</h3>
-                      <p className="text-xs text-emerald-200/60">Structured clinical clarity & next steps</p>
+                      <p className="text-xs text-emerald-200/60 truncate max-w-md">Query: {activeQuery}</p>
                     </div>
                   </div>
 
@@ -309,7 +325,7 @@ ${structuredResult.disclaimer}
                       <span>{copied ? 'Copied' : 'Copy'}</span>
                     </button>
                     <button
-                      onClick={() => handleSearch()}
+                      onClick={() => handleSearch(activeQuery)}
                       className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-semibold text-emerald-200 flex items-center gap-1.5 transition-colors"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
@@ -318,11 +334,21 @@ ${structuredResult.disclaimer}
                   </div>
                 </div>
 
+                {/* Key Takeaway Highlight if available */}
+                {structuredResult.keyTakeaway && (
+                  <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 flex items-center gap-3">
+                    <Lightbulb className="w-4 h-4 text-emerald-300 shrink-0" />
+                    <p className="text-xs text-emerald-100 font-medium leading-relaxed">
+                      <strong className="text-emerald-300 font-bold">Key Takeaway:</strong> {structuredResult.keyTakeaway}
+                    </p>
+                  </div>
+                )}
+
                 {/* 1. Summary Box */}
-                <div className="p-4 rounded-2xl bg-emerald-900/40 border border-emerald-500/30 space-y-2">
+                <div className="p-4 sm:p-5 rounded-2xl bg-emerald-900/40 border border-emerald-500/30 space-y-2">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-300">
                     <Check className="w-4 h-4 text-emerald-400" />
-                    <span>Summary & Quick Understanding</span>
+                    <span>Summary & Clinical Understanding</span>
                   </div>
                   <p className="text-sm text-emerald-50 leading-relaxed font-medium">
                     {structuredResult.summary}
@@ -347,11 +373,11 @@ ${structuredResult.disclaimer}
                     </ul>
                   </div>
 
-                  {/* What You Can Do Next */}
+                  {/* Actionable Next Steps */}
                   <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-teal-300">
                       <Stethoscope className="w-4 h-4" />
-                      <span>Actionable Next Steps</span>
+                      <span>Actionable Next Steps & Doctor Questions</span>
                     </div>
                     <ul className="space-y-2">
                       {structuredResult.recommendedNextSteps.map((item, i) => (
@@ -365,7 +391,7 @@ ${structuredResult.disclaimer}
                 </div>
 
                 {/* 4 & 5: When to seek care & Warning Signs */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {/* Seeking Care */}
                   <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-300">
@@ -398,6 +424,28 @@ ${structuredResult.disclaimer}
                     </ul>
                   </div>
                 </div>
+
+                {/* Suggested Follow-up Questions */}
+                {structuredResult.suggestedFollowUps && structuredResult.suggestedFollowUps.length > 0 && (
+                  <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/20 space-y-2.5">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-300">
+                      <MessageCircleQuestion className="w-4 h-4 text-emerald-400" />
+                      <span>Explore Related Health Questions</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {structuredResult.suggestedFollowUps.map((followUp, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handleSearch(followUp)}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-900/60 border border-emerald-500/30 hover:bg-emerald-700/50 text-xs text-emerald-100 text-left transition-colors flex items-center gap-1.5 group"
+                        >
+                          <span>{followUp}</span>
+                          <ArrowUpRight className="w-3 h-3 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Bottom navigation actions */}
                 <div className="pt-4 border-t border-emerald-500/20 flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -445,6 +493,7 @@ ${structuredResult.disclaimer}
                 key={idx}
                 onClick={() => {
                   setQuery(item.query);
+                  setActiveQuery(item.query);
                   setStructuredResult(item.result);
                   resultRef.current?.scrollIntoView({ behavior: 'smooth' });
                 }}
@@ -470,3 +519,4 @@ ${structuredResult.disclaimer}
     </div>
   );
 };
+
