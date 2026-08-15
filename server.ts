@@ -88,6 +88,67 @@ async function startServer() {
     return fallback;
   }
 
+  // Dedicated Secure Gemini API Proxy Route
+  app.post("/api/gemini/proxy", async (req, res) => {
+    try {
+      const { prompt, contents, history, systemInstruction, responseMimeType, responseSchema, model } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey) {
+        return res.status(503).json({ 
+          error: "GEMINI_API_KEY environment variable is not configured on the backend.",
+          code: "MISSING_KEY",
+          retryable: false
+        });
+      }
+
+      const genAI = new GoogleGenAI({ 
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      let finalContents = contents || prompt;
+      if (!finalContents && history && Array.isArray(history)) {
+        finalContents = history.map((h: any) => `${h.role || 'user'}: ${h.content || ''}`).join('\n');
+      }
+
+      const selectedModel = model || "gemini-3.7-flash";
+      const result = await genAI.models.generateContent({
+        model: selectedModel,
+        contents: finalContents,
+        config: {
+          systemInstruction: systemInstruction || undefined,
+          responseMimeType: responseMimeType || undefined,
+          responseSchema: responseSchema || undefined,
+        }
+      });
+
+      res.json({ text: result.text, success: true });
+    } catch (error: any) {
+      console.error("Gemini Proxy Error:", error);
+      let statusCode = 500;
+      let errorCode = "SERVER_ERROR";
+      let userMessage = error.message || "Gemini API proxy encountered an error.";
+
+      const errStr = (error?.message || "").toLowerCase();
+      if (errStr.includes("429") || errStr.includes("quota") || errStr.includes("rate limit")) {
+        statusCode = 429;
+        errorCode = "RATE_LIMIT";
+        userMessage = "Rate limit or quota exceeded for Gemini API. Please try again shortly.";
+      } else if (errStr.includes("timeout") || errStr.includes("deadline")) {
+        statusCode = 504;
+        errorCode = "TIMEOUT";
+        userMessage = "Request timed out while communicating with Gemini API.";
+      }
+
+      res.status(statusCode).json({ error: userMessage, code: errorCode, retryable: true });
+    }
+  });
+
   // AI API Route (General Gemini Proxy)
   app.post("/api/ai", async (req, res) => {
     try {
@@ -165,7 +226,11 @@ async function startServer() {
     };
 
     if (!apiKey) {
-      return res.json(fallbackResponse);
+      return res.status(503).json({ 
+        error: "HealthNav AI is temporarily unconfigured (GEMINI_API_KEY missing).",
+        code: "MISSING_KEY",
+        retryable: false
+      });
     }
 
     try {
@@ -265,7 +330,34 @@ Return ONLY a valid JSON object matching this schema:
       res.json(finalResult);
     } catch (err: any) {
       console.error("Health Navigator API Error:", err);
-      res.json(fallbackResponse);
+      let statusCode = 500;
+      let errorCode = "SERVER_ERROR";
+      let userMessage = "HealthNav AI encountered an issue while generating clinical guidance. Please try again.";
+
+      const errString = (err?.message || JSON.stringify(err)).toLowerCase();
+      if (errString.includes("429") || errString.includes("quota") || errString.includes("rate limit")) {
+        statusCode = 429;
+        errorCode = "RATE_LIMIT";
+        userMessage = "AI service rate limit or quota exceeded. Please wait a moment and try again.";
+      } else if (errString.includes("timeout") || errString.includes("timed out") || errString.includes("deadline")) {
+        statusCode = 504;
+        errorCode = "TIMEOUT";
+        userMessage = "The request timed out while communicating with Gemini 3.7 Flash. Please check your connection and retry.";
+      } else if (errString.includes("api key") || errString.includes("auth") || errString.includes("unauthorized")) {
+        statusCode = 401;
+        errorCode = "AUTH_ERROR";
+        userMessage = "API authentication failed. Please check your API key configuration.";
+      } else if (errString.includes("json") || errString.includes("syntax")) {
+        statusCode = 502;
+        errorCode = "INVALID_RESPONSE";
+        userMessage = "Received an invalid response format from the AI service. Please retry.";
+      }
+
+      return res.status(statusCode).json({
+        error: userMessage,
+        code: errorCode,
+        retryable: true
+      });
     }
   };
 

@@ -25,6 +25,7 @@ export const AINavigatorTab: React.FC<AINavigatorTabProps> = ({ onSelectTab }) =
   const [copied, setCopied] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isVoiceOutput, setIsVoiceOutput] = useState(false);
+  const [errorState, setErrorState] = useState<{ message: string; code?: string; retryable?: boolean } | null>(null);
   const [history, setHistory] = useState<{ query: string; result: AIStructuredResponse; time: string }[]>([]);
   const recognitionRef = useRef<any>(null);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -36,6 +37,8 @@ export const AINavigatorTab: React.FC<AINavigatorTabProps> = ({ onSelectTab }) =
     setLoading(true);
     setQuery(textToSubmit);
     setActiveQuery(textToSubmit);
+    setErrorState(null);
+    setStructuredResult(null);
 
     // Build recent context for multi-turn navigation
     const recentHistory = history.slice(0, 3).flatMap(h => [
@@ -58,9 +61,15 @@ export const AINavigatorTab: React.FC<AINavigatorTabProps> = ({ onSelectTab }) =
       setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Navigator search error:', err);
-      toast.error('Could not complete analysis. Please retry.');
+      const errMsg = err?.message || 'Could not complete analysis. Please check your network connection and retry.';
+      setErrorState({
+        message: errMsg,
+        code: err?.code || 'NETWORK_OR_SERVER_ERROR',
+        retryable: err?.retryable !== false
+      });
+      toast.error(errMsg);
     } finally {
       setLoading(false);
     }
@@ -293,6 +302,40 @@ ${structuredResult.disclaimer}
               <p className="text-xs text-emerald-200/60 max-w-md mx-auto">
                 Reviewing physiological parameters, cross-referencing health guidelines, and structuring next-step questions.
               </p>
+            </motion.div>
+          )}
+
+          {errorState && !loading && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              className="p-6 sm:p-8 rounded-3xl bg-red-950/60 border border-red-500/30 space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-500/20 border border-red-400/40 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Analysis Interrupted</h3>
+                  <p className="text-xs text-red-200/70">Error Code: {errorState.code || 'GENERAL_ERROR'}</p>
+                </div>
+              </div>
+
+              <p className="text-sm text-red-100 leading-relaxed font-medium bg-red-900/40 p-4 rounded-2xl border border-red-500/20">
+                {errorState.message}
+              </p>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                {errorState.retryable !== false && (
+                  <button
+                    onClick={() => handleSearch(activeQuery || query)}
+                    className="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-red-500/20 transition-all cursor-pointer"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Retry Analysis</span>
+                  </button>
+                )}
+              </div>
             </motion.div>
           )}
 
