@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
@@ -41,11 +40,10 @@ interface InMemMsg {
 let inMemoryConversations: InMemConv[] = [];
 let inMemoryMessages: InMemMsg[] = [];
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+const app = express();
+const PORT = 3000;
 
-  app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '10mb' }));
 
   // Helper to get Supabase client with user's token
   const getSupabase = (req: express.Request) => {
@@ -762,7 +760,9 @@ ${userContext}`;
   });
 
   // Vite middleware for development
+async function setupViteAndStart() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -781,5 +781,9 @@ ${userContext}`;
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  setupViteAndStart();
+}
+
+export default app;
 
