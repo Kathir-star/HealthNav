@@ -132,30 +132,37 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ onSetupClick, onSele
         </div>
 
         {/* 4 Health Quick Metric Tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-          <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
-            <p className="text-[10px] text-emerald-300/70 uppercase font-semibold">Resting HR</p>
-            <p className="text-lg font-bold text-white flex items-baseline gap-1">
-              {MOCK_VITALS.heartRate} <span className="text-[10px] text-emerald-400 font-normal">bpm</span>
-            </p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              DEMO DATA
+            </span>
           </div>
-          <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
-            <p className="text-[10px] text-emerald-300/70 uppercase font-semibold">Blood Oxygen</p>
-            <p className="text-lg font-bold text-white flex items-baseline gap-1">
-              {MOCK_VITALS.spO2} <span className="text-[10px] text-teal-400 font-normal">%</span>
-            </p>
-          </div>
-          <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
-            <p className="text-[10px] text-emerald-300/70 uppercase font-semibold">Active Steps</p>
-            <p className="text-lg font-bold text-white flex items-baseline gap-1">
-              {MOCK_VITALS.steps.toLocaleString()} <span className="text-[10px] text-lime-400 font-normal">steps</span>
-            </p>
-          </div>
-          <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
-            <p className="text-[10px] text-emerald-300/70 uppercase font-semibold">Sleep Duration</p>
-            <p className="text-lg font-bold text-white flex items-baseline gap-1">
-              {MOCK_VITALS.sleepHours} <span className="text-[10px] text-indigo-300 font-normal">hrs</span>
-            </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+              <p className="text-[10px] text-emerald-300/70 uppercase font-semibold">Resting HR</p>
+              <p className="text-lg font-bold text-white flex items-baseline gap-1">
+                {MOCK_VITALS.heartRate} <span className="text-[10px] text-emerald-400 font-normal">bpm</span>
+              </p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+              <p className="text-[10px] text-emerald-300/70 uppercase font-semibold">Blood Oxygen</p>
+              <p className="text-lg font-bold text-white flex items-baseline gap-1">
+                {MOCK_VITALS.spO2} <span className="text-[10px] text-teal-400 font-normal">%</span>
+              </p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+              <p className="text-[10px] text-emerald-300/70 uppercase font-semibold">Active Steps</p>
+              <p className="text-lg font-bold text-white flex items-baseline gap-1">
+                {MOCK_VITALS.steps.toLocaleString()} <span className="text-[10px] text-lime-400 font-normal">steps</span>
+              </p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+              <p className="text-[10px] text-emerald-300/70 uppercase font-semibold">Sleep Duration</p>
+              <p className="text-lg font-bold text-white flex items-baseline gap-1">
+                {MOCK_VITALS.sleepHours} <span className="text-[10px] text-indigo-300 font-normal">hrs</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>

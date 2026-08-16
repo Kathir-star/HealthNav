@@ -369,6 +369,7 @@ Return ONLY a valid JSON object matching this schema:
 
   // 1. POST /api/chat
   app.post("/api/chat", async (req, res) => {
+    console.log("AI chat request received:", { hasMessage: Boolean(req.body?.message), hasHistory: Array.isArray(req.body?.history) });
     try {
       const { message, conversation_id, profile } = req.body;
       if (!message) {
@@ -503,14 +504,16 @@ ${userContext}`;
         }));
 
         try {
+          console.log("Gemini request started with model: gemini-3.7-flash");
           const result = await genAI.models.generateContent({
             model: "gemini-3.7-flash",
             contents,
             config: { systemInstruction: systemPrompt }
           });
+          console.log("Gemini response received successfully");
           aiResponse = result.text || "I am your HealthNav AI Assistant. How can I help you navigate your health today?";
         } catch (geminiError: any) {
-          console.error("Gemini call error:", geminiError);
+          console.error("Gemini call error details:", geminiError?.message || geminiError, geminiError?.status);
           aiResponse = "HealthNav AI is currently handling high volume. Please check your query or consult a healthcare provider for immediate medical advice.\n\n*Disclaimer: HealthNav provides AI-assisted health information and navigation.*";
         }
       } else {
