@@ -367,6 +367,84 @@ Return ONLY a valid JSON object matching this schema:
 
   // --- Chat System APIs ---
 
+  function getSmartFallback(message: string): string {
+    const lower = (message || "").toLowerCase().trim();
+
+    // 10. Emergency / High-Risk Questions
+    const emergencyKeywords = ["chest pain", "can't breathe", "cant breathe", "breathing", "stroke", "unconscious", "severe bleeding", "heart attack", "suicide", "suicidal", "passed out", "severe pain"];
+    if (emergencyKeywords.some(k => lower.includes(k))) {
+      return "HealthNav AI is currently unavailable.\n\nBecause this may involve a potentially serious medical emergency, please don't wait for the AI to respond.\n\nSeek immediate medical attention or contact your local emergency service.";
+    }
+
+    // 11. Greeting
+    if (["hi", "hello", "hey", "good morning", "good afternoon", "good evening", "greetings"].some(g => lower === g || lower.startsWith(g + " ") || lower.startsWith(g + ","))) {
+      return "Hi! I'm HealthNav AI.\n\nI'm temporarily having trouble connecting to my AI service, but you can still ask me general health questions.\n\nFor personal health information, I won't guess or invent data that I can't access.";
+    }
+
+    // 4. User Health Data
+    if (["blood pressure", "bp", "heart rate", "pulse", "blood sugar", "glucose", "weight"].some(k => lower.includes(k)) && (lower.includes("my") || lower.includes("what is my") || lower.includes("show"))) {
+      return "I can't access your HealthNav health data right now.\n\nI don't want to guess or provide a made-up value.\n\nPlease check your HealthNav records or try again once AI and your health-data service are available.";
+    }
+
+    // 5. Medical History
+    if (["conditions", "diagnosed", "medical history", "what medical", "my health status", "what do i have"].some(k => lower.includes(k))) {
+      return "I can't access your stored HealthNav medical information right now.\n\nI don't want to invent or assume any medical conditions.\n\nPlease try again later or check your saved health records.";
+    }
+
+    // 6. Health Records
+    if (["record", "report", "lab result", "test result", "document"].some(k => lower.includes(k))) {
+      return "I’m temporarily unable to retrieve your HealthNav records.\n\nYour health information has not been changed or deleted.\n\nPlease try again shortly.";
+    }
+
+    // 7. Appointments
+    if (["appointment", "doctor visit", "schedule", "booking", "when is my next"].some(k => lower.includes(k))) {
+      return "I can't access your appointment information right now, so I don't want to guess.\n\nPlease check your HealthNav appointment section or try again when the service is available.";
+    }
+
+    // 3. Medication
+    if (["medication", "pill", "dose", "paracetamol", "ibuprofen", "drug", "prescription", "used for"].some(k => lower.includes(k)) && !lower.includes("diabetes")) {
+      return "HealthNav AI is temporarily unavailable.\n\nParacetamol (acetaminophen) is commonly used to reduce pain and fever. The appropriate dose depends on factors such as age, other medications, and health conditions.\n\nFor personalized medication advice, check the product instructions or consult a qualified healthcare professional.";
+    }
+
+    // 2. Symptoms
+    if (["headache", "dizzy", "pain", "fever", "cough", "symptom", "ache", "hurt", "sick", "nause"].some(k => lower.includes(k))) {
+      return "I’s unable to connect to HealthNav AI right now, so I don't want to guess about your symptoms.\n\nHeadache and dizziness can have many possible causes, ranging from minor issues to conditions that need medical attention.\n\nIf your symptoms are severe, sudden, worsening, or accompanied by symptoms such as fainting, confusion, weakness, difficulty speaking, chest pain, or severe breathing problems, seek urgent medical care.\n\nOtherwise, consider contacting a healthcare professional for an appropriate evaluation.";
+    }
+
+    // 14. Follow-up Questions
+    if (["why", "what do you mean", "explain that", "how so", "can you clarify"].some(k => lower === k || lower.startsWith(k))) {
+      return "I’s unable to connect to HealthNav AI right now, and I don't have enough context to answer that follow-up accurately.";
+    }
+
+    // 13. Non-Health Question
+    if (["capital", "president", "weather", "movie", "sport", "math", "python", "javascript", "code", "recipe", "car", "flight", "france"].some(k => lower.includes(k))) {
+      return "I'm currently unable to connect to HealthNav AI.\n\nHealthNav is primarily designed to help with health information and navigation. Please try your question again when the AI service is available.";
+    }
+
+    // 9. Fitness / Lifestyle
+    if (["fitness", "exercise", "workout", "diet", "nutrition", "sleep", "weight loss", "active", "improve my fitness"].some(k => lower.includes(k))) {
+      return "HealthNav AI is temporarily unavailable, but some general healthy habits include regular physical activity, adequate sleep, balanced nutrition, sufficient hydration, and gradually increasing activity according to your fitness level.\n\nFor a plan tailored to your health conditions or medications, consult a qualified professional.";
+    }
+
+    // 1. General Health / Diabetes
+    if (lower.includes("diabetes")) {
+      return "HealthNav AI is temporarily unavailable, but I can still give you a basic overview.\n\nDiabetes is a condition where blood glucose levels remain higher than normal because the body does not produce enough insulin, does not use insulin effectively, or both.\n\nIf you're asking because of a personal health concern, consider discussing your symptoms or test results with a qualified healthcare professional.";
+    }
+
+    // 8. Health Education
+    if (lower.includes("blood pressure") || lower.startsWith("what is") || lower.startsWith("define") || lower.startsWith("explain")) {
+      return "HealthNav AI is temporarily unavailable.\n\nBlood pressure is the force of circulating blood against the walls of your blood vessels. It is usually recorded using two numbers: systolic and diastolic pressure.\n\nIf you're asking about a specific reading, share the reading or check your HealthNav records rather than relying on a general explanation.";
+    }
+
+    // 12. Unclear Question
+    if (lower.length < 5 || ["tell me about this", "help", "what", "huh"].some(k => lower === k)) {
+      return "I'm having trouble connecting to HealthNav AI right now, and I don't have enough context to answer that accurately.\n\nPlease provide a little more detail about what you'd like to know.";
+    }
+
+    // Default General Health fallback
+    return "HealthNav AI is temporarily unavailable.\n\nHealthNav provides guidance on health information, symptoms, and clinical navigation.\n\nIf you're asking because of a personal health concern, consider discussing your questions or symptoms with a qualified healthcare professional.";
+  }
+
   // 1. POST /api/chat
   app.post("/api/chat", async (req, res) => {
     console.log("AI chat request received:", { hasMessage: Boolean(req.body?.message), hasHistory: Array.isArray(req.body?.history) });
@@ -460,6 +538,7 @@ Return ONLY a valid JSON object matching this schema:
       // Gemini AI Integration
       const apiKey = process.env.GEMINI_API_KEY;
       let aiResponse = "";
+      let responseSource = "gemini";
 
       if (apiKey) {
         const genAI = new GoogleGenAI({ 
@@ -481,20 +560,21 @@ Return ONLY a valid JSON object matching this schema:
 * Pregnancy status: ${profile.pregnancy?.status?.replace("_", " ") || "Not pregnant"}
 ` : "No individual profile data provided.";
 
-        const systemPrompt = `You are HealthNav AI, the trusted AI Healthcare Navigator.
-Your role is to help users navigate their health questions, understand medical terms and reports, prepare for doctor visits, and identify when to seek professional care.
+        const systemPrompt = `You are HealthNav AI, an AI-powered healthcare navigation assistant.
 
-Communication Guidelines:
-1. Tone: Calm, compassionate, objective, and clear.
-2. Structure your replies clearly using markdown headers where helpful:
-   - **Summary & Understanding**
-   - **What This Could Mean**
-   - **Recommended Next Steps & Doctor Questions**
-   - **When to Seek Care & Warning Signs**
-3. Emphasize that you provide health navigation and educational clarity, not medical diagnoses.
-4. If a symptom sounds potentially emergent (severe chest pain, breathing difficulty, sudden speech or mobility loss), immediately urge calling emergency services (such as 102 / 911).
-5. Conclude with:
-*Disclaimer: HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice.*
+Help users understand health information clearly and safely.
+
+You are not a doctor and must not claim to diagnose diseases.
+
+Never invent user information, medical history, medications, symptoms, test results, appointments, or health metrics.
+
+Only use information provided by the user or retrieved from authorized HealthNav data.
+
+If information is unavailable, clearly say that it is unavailable.
+
+Do not prescribe medication or recommend changing medication dosage.
+
+For potentially serious symptoms, recommend appropriate professional medical care.
 
 ${userContext}`;
 
@@ -511,13 +591,19 @@ ${userContext}`;
             config: { systemInstruction: systemPrompt }
           });
           console.log("Gemini response received successfully");
-          aiResponse = result.text || "I am your HealthNav AI Assistant. How can I help you navigate your health today?";
+          aiResponse = result.text || "";
+          if (!aiResponse.trim()) {
+            throw new Error("Empty response from Gemini");
+          }
+          responseSource = "gemini";
         } catch (geminiError: any) {
           console.error("Gemini call error details:", geminiError?.message || geminiError, geminiError?.status);
-          aiResponse = "HealthNav AI is currently handling high volume. Please check your query or consult a healthcare provider for immediate medical advice.\n\n*Disclaimer: HealthNav provides AI-assisted health information and navigation.*";
+          aiResponse = getSmartFallback(message);
+          responseSource = "fallback";
         }
       } else {
-        aiResponse = "Welcome to HealthNav! I am your AI Health Navigator. I can help explain medical terms, organize questions for your physician, and review general health guidance.\n\nTo enable live generative analysis, ensure your GEMINI_API_KEY is configured in project settings.\n\n*Disclaimer: HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice.*";
+        aiResponse = getSmartFallback(message);
+        responseSource = "fallback";
       }
 
       // Save AI Response
@@ -547,7 +633,8 @@ ${userContext}`;
       res.json({ 
         reply: aiResponse,
         text: aiResponse, 
-        conversation_id: convId 
+        conversation_id: convId,
+        responseSource
       });
 
     } catch (error: any) {
