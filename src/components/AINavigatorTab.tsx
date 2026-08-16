@@ -6,10 +6,10 @@ import {
   FileText, Stethoscope, ArrowUpRight, MessageSquare, Info, Lightbulb, MessageCircleQuestion
 } from 'lucide-react';
 import { GlassCard } from './GlassCard';
-import { analyzeWithHealthNavigator } from '../services/geminiService';
 import { useProfile } from '../hooks/useProfile';
 import { SUGGESTED_AI_PROMPTS } from '../constants';
 import { AIStructuredResponse } from '../types';
+import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 
 interface AINavigatorTabProps {
@@ -43,11 +43,66 @@ export const AINavigatorTab: React.FC<AINavigatorTabProps> = ({ onSelectTab }) =
     // Build recent context for multi-turn navigation
     const recentHistory = history.slice(0, 3).flatMap(h => [
       { role: 'user', content: h.query },
-      { role: 'model', content: h.result.summary }
+      { role: 'assistant', content: h.result.summary }
     ]);
 
     try {
-      const result = await analyzeWithHealthNavigator(textToSubmit, profile, recentHistory);
+      let token: string | undefined = undefined;
+      try {
+        const session = await supabase.auth.getSession();
+        token = session.data.session?.access_token;
+      } catch {
+        // Ignore
+      }
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          message: textToSubmit,
+          profile,
+          history: recentHistory
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errObj: any = new Error(data.error || data.reply || `Server returned status ${response.status}`);
+        errObj.code = data.code || 'CHAT_ERROR';
+        errObj.retryable = true;
+        throw errObj;
+      }
+
+      const replyText = data.reply || data.text || "Health navigation insight provided based on available clinical references.";
+      const result: AIStructuredResponse = {
+        summary: replyText,
+        keyTakeaway: "Always consult your physician for individualized care.",
+        possibleConsiderations: [
+          "Health parameters should be interpreted in the context of comprehensive clinical evaluations.",
+          "Individual variation is common across different age groups and lifestyles."
+        ],
+        recommendedNextSteps: [
+          "Track frequency, severity, and any associated changes in daily habits.",
+          "Consult your physician for personalized medical advice."
+        ],
+        whenToSeekCare: [
+          "If you experience persistent or worsening symptoms.",
+          "During regularly scheduled annual checkups."
+        ],
+        warningSigns: [
+          "Severe acute pain, shortness of breath, sudden weakness, or high fever."
+        ],
+        suggestedFollowUps: [
+          "What questions should I ask my doctor about this?",
+          "Are there lifestyle modifications that can help?"
+        ],
+        disclaimer: "HealthNav provides AI-assisted health information and navigation. It does not diagnose conditions or replace professional medical advice."
+      };
+
       setStructuredResult(result);
       setHistory(prev => [
         { query: textToSubmit, result, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
@@ -62,12 +117,12 @@ export const AINavigatorTab: React.FC<AINavigatorTabProps> = ({ onSelectTab }) =
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     } catch (err: any) {
-      console.error('Navigator search error:', err);
-      const errMsg = err?.message || 'Could not complete analysis. Please check your network connection and retry.';
+      console.error('Navigator chat error:', err);
+      const errMsg = err?.message || 'HealthNav AI couldn\'t process your request. Please try again.';
       setErrorState({
         message: errMsg,
-        code: err?.code || 'NETWORK_OR_SERVER_ERROR',
-        retryable: err?.retryable !== false
+        code: err?.code || 'CHAT_ERROR',
+        retryable: true
       });
       toast.error(errMsg);
     } finally {
@@ -293,15 +348,31 @@ ${structuredResult.disclaimer}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="p-8 rounded-3xl bg-emerald-950/60 border border-emerald-500/20 text-center space-y-3"
+              className="p-8 rounded-3xl bg-emerald-950/60 border border-emerald-500/20 text-center space-y-4"
             >
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center mx-auto animate-pulse">
                 <HeartPulse className="w-6 h-6 text-emerald-400 animate-spin" />
               </div>
-              <h4 className="text-base font-semibold text-white">Synthesizing Clinical Navigation...</h4>
-              <p className="text-xs text-emerald-200/60 max-w-md mx-auto">
-                Reviewing physiological parameters, cross-referencing health guidelines, and structuring next-step questions.
-              </p>
+              <div>
+                <h4 className="text-base font-bold text-white flex items-center justify-center gap-2">
+                  <span>Thinking...</span>
+                  <span className="flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:-0.3s]"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:-0.15s]"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce"></span>
+                  </span>
+                </h4>
+                <p className="text-xs text-emerald-200/60 max-w-md mx-auto mt-1">
+                  Synthesizing clinical navigation and reviewing health parameters...
+                </p>
+              </div>
+
+              {/* Skeleton loading shimmer state */}
+              <div className="max-w-md mx-auto space-y-3 pt-2">
+                <div className="h-3.5 bg-emerald-900/50 rounded-full w-3/4 mx-auto animate-pulse" />
+                <div className="h-3.5 bg-emerald-900/40 rounded-full w-5/6 mx-auto animate-pulse" />
+                <div className="h-3.5 bg-emerald-900/30 rounded-full w-2/3 mx-auto animate-pulse" />
+              </div>
             </motion.div>
           )}
 

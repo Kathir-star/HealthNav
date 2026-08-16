@@ -542,6 +542,7 @@ ${userContext}`;
       }
 
       res.json({ 
+        reply: aiResponse,
         text: aiResponse, 
         conversation_id: convId 
       });
